@@ -1,2 +1,10 @@
-# PyTorch-On-Angel
-PyTorch On Angel, arming PyTorch with a powerful Parameter Server, which enable PyTorch to train very big models. At the same time.
+## Pytorch on Angel 
+
+A light-weight project which runs pytorch on angel, providing pytorch the ability to run with high-dimensional models.
+
+### Compile and Installation
+
+#### Install Pytorch
+``bash
+pip install pytorch
+``
