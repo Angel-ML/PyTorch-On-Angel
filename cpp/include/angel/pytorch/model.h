@@ -29,8 +29,16 @@ class TorchModel {
     module_ = torch::jit::load(path);
   }
 
-  at::Tensor forward(std::vector<torch::jit::IValue> inputs) {
-    return module_.get_method("forward_")(std::move(inputs)).toTensor();
+  c10::IValue forward(std::vector<torch::jit::IValue> inputs) {
+    return module_.get_method("forward_")(std::move(inputs));
+  }
+
+  c10::IValue predict(std::vector<torch::jit::IValue> inputs) {
+    return module_.get_method("predict_")(std::move(inputs));
+  }
+
+  c10::IValue exec_method(const std::string &method, std::vector<torch::jit::IValue> inputs) {
+    return module_.get_method(method)(std::move(inputs));
   }
 
   at::Tensor serving_forward(std::vector<torch::jit::IValue> inputs) {
@@ -39,15 +47,23 @@ class TorchModel {
 
   float backward(std::vector<torch::jit::IValue> inputs, at::Tensor targets) {
     auto outputs = forward(std::move(inputs));
-//    std::cout << "outputs.size()=" << outputs.sizes() << std::endl;
-//    std::cout << "targets.size()=" << targets.sizes() << std::endl;
-    std::vector<torch::jit::IValue> loss_inputs;
-    loss_inputs.resize(2);
-    loss_inputs[0] = outputs;
-    loss_inputs[1] = std::move(targets);
-    auto loss = module_.get_method("loss")(loss_inputs).toTensor();
-    loss.backward();
-    return loss.item().toFloat();
+    if (outputs.isTensor()) {
+      std::vector<torch::jit::IValue> backward_inputs;
+      backward_inputs.emplace_back(outputs.toTensor());
+      backward_inputs.emplace_back(targets);
+      auto loss = module_.get_method("loss")(backward_inputs).toTensor();
+      loss.backward();
+      return loss.item().toFloat();
+    } else if (outputs.isTuple()) {
+      auto elements = outputs.toTuple()->elements();
+      if (targets.defined())
+        elements.emplace_back(targets);
+      auto loss = module_.get_method("loss")(elements).toTensor();
+      loss.backward();
+      return loss.item().toFloat();
+    } else {
+      throw std::logic_error("The output of forward should be tensor or tuple");
+    }
   }
 
   std::string get_string(const std::string &method) {
@@ -113,9 +129,6 @@ class TorchModel {
   std::string get_name() {
     return get_string("get_name");
   }
-
-  /* for graph algorithms */
-  std::vector<std::pair<std::string, at::Tensor>> named_parameters();
 
   int get_parameters_total_size();
 

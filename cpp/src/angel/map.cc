@@ -72,5 +72,4 @@ bool jni_map_contain(JNIEnv *env, jobject map, jobject key) {
   return env->CallBooleanMethod(map, Map_containsKey, key);
 }
 
-
 }

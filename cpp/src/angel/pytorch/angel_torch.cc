@@ -62,6 +62,7 @@ JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getType
  * Signature: (J)[I
  */
 JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsSize
+
   (JNIEnv *env, jclass jcls, jlong jptr) {
   DEFINE_MODEL_PTR(angel::TorchModel, jptr);
   auto output = ptr->get_mats_size();
@@ -233,7 +234,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
     return output_ptr_jarray;
   } else {
     add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
-    auto output = ptr->forward(inputs);
+    auto output = ptr->forward(inputs).toTensor();
     auto output_ptr = output.data_ptr();
     DEFINE_JFLOATARRAY(output_ptr, batch_size);
 
@@ -295,58 +296,53 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
   release_array(env, ptrs, jparams);
 }
 
-
-
-/*
- * Class:     com_tencent_angel_pytorch_Torch
- * Method:    gcnForward
- * Signature: (JLjava/util/Map;)[F
- */
-JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_gcnForward
-  (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams) {
+void gcn_add_parameters(JNIEnv *env,
+  std::vector<torch::jit::IValue> *inputs,
+  std::vector<std::pair<std::string, void *>> *ptrs,
+  jobject jparams) {
   using namespace angel;
-  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
-  // build inputs
-  std::vector<torch::jit::IValue> inputs;
-  std::vector<std::pair<std::string, void *>> ptrs;
 
-  // calculate x dimention
+  // calculate x dimension and add x
   int feature_dim = jni_map_get_int(env, jparams, "feature_dim");
-  jarray x = (jarray) jni_map_get(env, jparams, "x");
-  int x_num = env->GetArrayLength(x) / feature_dim;
-  add_input(env, &inputs, &ptrs, jparams, {x_num , feature_dim}, TORCH_OPTION_FLOAT, "x");
+  const std::vector<std::string> x_keys = {"x", "pos_x", "neg_x"};
+  for (auto x_key: x_keys)
+    if (jni_map_contain(env, jparams, x_key)) {
+      jarray x = (jarray) jni_map_get(env, jparams, x_key);
+      int x_num = env->GetArrayLength(x) / feature_dim;
+      add_input(env, inputs, ptrs, jparams, {x_num, feature_dim}, TORCH_OPTION_FLOAT, x_key);
+    }
 
-  // calculate edge_index dimension
-  if (jni_map_contain(env, jparams, "edge_index")) {
-    // full batch
-    jarray edge_index = (jarray) jni_map_get(env, jparams, "edge_index");
-    int edge_num = env->GetArrayLength(edge_index) / 2;
-    add_input(env, &inputs, &ptrs, jparams, {2, edge_num}, TORCH_OPTION_INT64, "edge_index");
-  } else if (jni_map_contain(env, jparams, "first_edge_index") && jni_map_contain(env, jparams, "second_edge_index")) {
-    // mini-batch two-order
-    jarray first_edge_index = (jarray) jni_map_get(env, jparams, "first_edge_index");
-    jarray second_edge_index = (jarray) jni_map_get(env, jparams, "second_edge_index");
-    int first_edge_num = env->GetArrayLength(first_edge_index) / 2;
-    int second_edge_num = env->GetArrayLength(second_edge_index) / 2;
-    add_input(env, &inputs, &ptrs, jparams, {2, first_edge_num}, TORCH_OPTION_INT64, "first_edge_index");
-    add_input(env, &inputs, &ptrs, jparams, {2, second_edge_num}, TORCH_OPTION_INT64, "second_edge_index");
-  }
+  // add edge_index
+  const std::vector<std::string> edge_keys = {"edge_index", "first_edge_index", "second_edge_index"};
+  for (auto edge_key: edge_keys)
+    if (jni_map_contain(env, jparams, edge_key)) {
+      jarray edge_index = (jarray) jni_map_get(env, jparams, edge_key);
+      int edge_num = env->GetArrayLength(edge_index) / 2;
+      add_input(env, inputs, ptrs, jparams, {2, edge_num}, TORCH_OPTION_INT64, edge_key);
+    }
+}
 
-  // set weights to torch models
+void gcn_set_weights(JNIEnv *env,
+  angel::TorchModel *model_ptr,
+  std::vector<std::pair<std::string, void *>> *ptrs,
+  jobject jparams) {
+  using namespace angel;
   jboolean is_copy;
   jarray weights = (jarray) jni_map_get(env, jparams, "weights");
-  int weights_length = env->GetArrayLength(weights);
-  DEFINE_PRIMITIVE_ARRAY(weights);
-  ptr->set_parameters(weights_cptr, weights_length);
+  void* weights_cptr = env->GetPrimitiveArrayCritical(weights, &is_copy);
+  ptrs->push_back(std::make_pair("weights", weights_cptr));
+  model_ptr->set_parameters(weights_cptr, env->GetArrayLength(weights));
+}
 
-  auto output = std::get<1>(ptr->forward(inputs).max(1));
-  int output_size = output.view({-1}).size(0);
-  jlongArray joutput = env->NewLongArray(output_size);
-  env->SetLongArrayRegion(joutput, 0, output_size, output.data<int64_t>());
-
-  RELEASE_PRIMITIVE_ARRAY(weights)
-  release_array(env, ptrs, jparams);
-  return joutput;
+void gcn_set_grads(JNIEnv *env,
+  angel::TorchModel *model_ptr,
+  const std::vector<std::pair<std::string, void*>> &ptrs,
+  jobject jparams) {
+  using namespace angel;
+  jarray weights = (jarray) jni_map_get(env, jparams, "weights");
+  for (auto item : ptrs)
+    if (item.first == "weights")
+      model_ptr->set_grads(item.second, env->GetArrayLength(weights));
 }
 
 /*
@@ -362,52 +358,60 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
   std::vector<torch::jit::IValue> inputs;
   std::vector<std::pair<std::string, void*>> ptrs;
 
-  // calculate x dimension
-  int feature_dim = jni_map_get_int(env, jparams, "feature_dim");
-  jarray x = (jarray) jni_map_get(env, jparams, "x");
-  int x_num = env->GetArrayLength(x) / feature_dim;
-  // add x to inputs
-  add_input(env, &inputs, &ptrs, jparams, {x_num, feature_dim}, TORCH_OPTION_FLOAT, "x");
+  gcn_add_parameters(env, &inputs, &ptrs, jparams);
+  gcn_set_weights(env, ptr, &ptrs, jparams);
 
-  // calculate edge_index dimension
-  if (jni_map_contain(env, jparams, "edge_index")) {
-    // full batch
-    jarray edge_index = (jarray) jni_map_get(env, jparams, "edge_index");
-    int edge_num = env->GetArrayLength(edge_index) / 2;
-    add_input(env, &inputs, &ptrs, jparams, {2, edge_num}, TORCH_OPTION_INT64, "edge_index");
-  } else if (jni_map_contain(env, jparams, "first_edge_index") && jni_map_contain(env, jparams, "second_edge_index")) {
-    // mini-batch two-order
-    jarray first_edge_index = (jarray) jni_map_get(env, jparams, "first_edge_index");
-    jarray second_edge_index = (jarray) jni_map_get(env, jparams, "second_edge_index");
-    int first_edge_num = env->GetArrayLength(first_edge_index) / 2;
-    int second_edge_num = env->GetArrayLength(second_edge_index) / 2;
-    add_input(env, &inputs, &ptrs, jparams, {2, first_edge_num}, TORCH_OPTION_INT64, "first_edge_index");
-    add_input(env, &inputs, &ptrs, jparams, {2, second_edge_num}, TORCH_OPTION_INT64, "second_edge_index");
+  // get targets if defined
+  at::Tensor targets; // undefined targets
+  if (jni_map_contain(env, jparams, "targets")) {
+    jboolean is_copy;
+    jarray jtargets = (jarray) jni_map_get(env, jparams, "targets");
+    void* jtargets_cptr = env->GetPrimitiveArrayCritical(jtargets, &is_copy);
+    targets = torch::from_blob(jtargets_cptr, {env->GetArrayLength(jtargets)}, TORCH_OPTION_INT64);
+    ptrs.push_back(std::make_pair("targets", jtargets_cptr));
   }
 
-  // set weights to torch models
-  jboolean is_copy;
-  jarray weights = (jarray) jni_map_get(env, jparams, "weights");
-  DEFINE_PRIMITIVE_ARRAY(weights)
-  ptr->set_parameters(weights_cptr, env->GetArrayLength(weights));
-
-  // get targets
-  jarray targets = (jarray) jni_map_get(env, jparams, "targets");
-  DEFINE_PRIMITIVE_ARRAY(targets)
-  DEFINE_JARRAY_TENSOR_DIM_INT64(targets);
-
   ptr->zero_grad();
-  auto loss = ptr->backward(inputs, targets_tensor);
-  ptr->set_grads(weights_cptr, env->GetArrayLength(weights));
+  auto loss = ptr->backward(inputs, targets);
+  gcn_set_grads(env, ptr, ptrs, jparams);
 
   release_array(env, ptrs, jparams);
-  RELEASE_PRIMITIVE_ARRAY(weights)
-  RELEASE_PRIMITIVE_ARRAY(targets)
   return loss;
-
-
 }
 
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    gcnExecMethod
+ * Signature: (JLjava/lang/String;Ljava/util/Map;)Ljava/lang/Object;
+ */
+JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
+  (JNIEnv *env, jclass jcls, jlong jptr, jstring jmethod, jobject jparams) {
+  using namespace angel;
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  // build inputs
+  std::vector<torch::jit::IValue> inputs;
+  std::vector<std::pair<std::string, void *>> ptrs;
+
+  gcn_add_parameters(env, &inputs, &ptrs, jparams);
+  gcn_set_weights(env, ptr, &ptrs, jparams);
+
+  const char* method = env->GetStringUTFChars(jmethod, 0);
+  auto output = ptr->exec_method(method, inputs).toTensor();
+  env->ReleaseStringUTFChars(jmethod, method);
+
+  jarray joutput;
+  if (output.dtype().id() == caffe2::TypeIdentifier::Get<float>()) {
+    joutput = env->NewFloatArray(output.numel());
+    env->SetFloatArrayRegion((jfloatArray)joutput, 0, output.numel(), output.data<float>());
+  } else if (output.dtype().id() == caffe2::TypeIdentifier::Get<int64_t>()) {
+    joutput = env->NewLongArray(output.numel());
+    env->SetLongArrayRegion((jlongArray)joutput, 0, output.numel(), output.data<int64_t>());
+  } else
+    throw std::logic_error("the dtype for predict should be float or int64");
+
+  release_array(env, ptrs, jparams);
+  return joutput;
+}
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -433,5 +437,4 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getParameters
 
   return array;
 }
-
 

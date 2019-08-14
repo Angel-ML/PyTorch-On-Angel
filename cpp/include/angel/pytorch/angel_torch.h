@@ -118,16 +118,6 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_backward
  */
 JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
   (JNIEnv *, jclass, jlong, jobject);
-
-
-/*
- * Class:     com_tencent_angel_pytorch_Torch
- * Method:    gcnForward
- * Signature: (JLjava/util/Map;)[F
- */
-JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_gcnForward
-  (JNIEnv *, jclass, jlong, jobject);
-
 /*
  * Class:     com_tencent_angel_pytorch_Torch
  * Method:    gcnBackward
@@ -135,6 +125,14 @@ JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_gcnForward
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
   (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    gcnExecMethod
+ * Signature: (JLjava/lang/String;Ljava/util/Map;)Ljava/lang/Object;
+ */
+JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
+  (JNIEnv *, jclass, jlong, jstring, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch

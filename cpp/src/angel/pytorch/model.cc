@@ -7,28 +7,6 @@
 
 namespace angel {
 
-std::vector<std::pair<std::string, at::Tensor>> TorchModel::named_parameters() {
-  std::vector<std::pair<std::string, at::Tensor>> parameters;
-
-  // parameters from sub-modules, assuming that only one level of child-modules
-//  auto modules = module_.get_modules();
-//  for (auto const& m: module_.get_modules()) {
-//    const std::string module_name = m;
-//    auto params = m.get_parameters();
-//    for (auto const & p: params) {
-//      std::string p_name = module_name + "." + p.name();
-//      parameters.emplace_back(std::make_pair(p_name, p.value().toTensor()));
-//    }
-//  }
-//
-//  auto params = module_->get_parameters();
-//  for (auto &it: params)
-//    parameters.emplace_back(std::make_pair(it.name(),
-//      it.value().toTensor()));
-//
-  return parameters;
-}
-
 int TorchModel::get_parameters_total_size() {
   int size = 0;
   for (auto const &m: module_.get_modules())

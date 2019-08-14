@@ -22,6 +22,7 @@ void jni_map_set(JNIEnv *env, jobject map, jobject key, jobject value);
 void jni_map_set(JNIEnv *env, jobject map, const std::string& key, int value);
 bool jni_map_contain(JNIEnv *env, jobject map, const std::string& key);
 bool jni_map_contain(JNIEnv *env, jobject map, jobject key);
-}
+
+} // namespace angel
 
 #endif //TORCH_ON_ANGEL_MAP_H
