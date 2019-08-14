@@ -3,10 +3,14 @@ package com.tencent.angel.pytorch.torch;
 import com.tencent.angel.exception.AngelException;
 import com.tencent.angel.ml.math2.matrix.CooLongFloatMatrix;
 import com.tencent.angel.pytorch.Torch;
+import org.apache.spark.SparkEnv;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TorchModel implements Serializable {
 
@@ -17,7 +21,10 @@ public class TorchModel implements Serializable {
 
   private long ptr = 0;
   private static String path;
-  private static TorchModel model = null;
+  private static BlockingQueue<TorchModel> modelsQueue = new LinkedBlockingQueue<TorchModel>();
+  private static AtomicInteger counter = new AtomicInteger(0);
+  private static int cores = SparkEnv.get().conf()
+    .getInt("spark.executor.cores", 1);
 
   private TorchModel() {}
 
@@ -25,14 +32,22 @@ public class TorchModel implements Serializable {
     ptr = Torch.initPtr(path);
   }
 
-  public static TorchModel get() {
-    if (model == null) {
+  public static synchronized TorchModel get() throws InterruptedException {
+    if (modelsQueue.isEmpty()) {
       if (path == null)
         throw new AngelException("Please set path before accessing model");
-      model = new TorchModel();
+      TorchModel model = new TorchModel();
       model.init(path);
+      modelsQueue.put(model);
+      counter.addAndGet(1);
+      if (counter.get() > cores)
+        throw new AngelException("The size of torch model exceeds the cores");
     }
-    return model;
+    return modelsQueue.take();
+  }
+
+  public static void addModel(TorchModel torchModel) throws InterruptedException {
+    TorchModel.modelsQueue.put(torchModel);
   }
 
   public static void setPath(String path) {
@@ -202,48 +217,64 @@ public class TorchModel implements Serializable {
     return Torch.backward(ptr, params);
   }
 
-  /* forward/backward for gcn models */
-  public long[] gcnForward(int batchSize, float[] x, int featureDim, long[] edgeIndex, float[] weights) {
-    Map<String, Object> params = new HashMap<String, Object>();
-    params.put("batchSize", batchSize);
-    params.put("x", x);
-    params.put("feature_dim", featureDim);
-    params.put("edge_index", edgeIndex);
-    params.put("weights", weights);
-    return Torch.gcnForward(ptr, params);
-  }
+  /* forward/backward/predict for gcn models */
 
-  public long[] gcnForward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+  public float[] gcnForward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
-    params.put("batchSize", batchSize);
+    params.put("batch_size", batchSize);
     params.put("x", x);
     params.put("feature_dim", featureDim);
     params.put("first_edge_index", firstEdgeIndex);
     params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
-    return Torch.gcnForward(ptr, params);
+    return (float[]) Torch.gcnExecMethod(ptr, "forward_", params);
   }
 
-  public float gcnBackward(int batchSize, float[] x, int featureDim, long[] edgeIndex, float[] weights, long[] targets) {
+  public long[] gcnPredict(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
-    params.put("batchSize", batchSize);
+    params.put("batch_size", batchSize);
     params.put("x", x);
     params.put("feature_dim", featureDim);
-    params.put("edge_index", edgeIndex);
+    params.put("first_edge_index", firstEdgeIndex);
+    params.put("second_edge_index", secondEdgeIndex);
+    params.put("weights", weights);
+    return (long[]) Torch.gcnExecMethod(ptr, "predict_", params);
+  }
+
+  public float gcnBackward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights, long[] targets) {
+    Map<String, Object> params = new HashMap<String, Object>();
+    params.put("batch_size", batchSize);
+    params.put("x", x);
+    params.put("feature_dim", featureDim);
+    params.put("first_edge_index", firstEdgeIndex);
+    params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
     params.put("targets", targets);
     return Torch.gcnBackward(ptr, params);
   }
 
-  public float gcnBackward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights, long[] targets) {
+  public float[] gcnEmbedding(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
-    params.put("batchSize", batchSize);
+    params.put("batch_size", batchSize);
     params.put("x", x);
     params.put("feature_dim", featureDim);
     params.put("first_edge_index", firstEdgeIndex);
-    params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
-    params.put("targets", targets);
+    if (secondEdgeIndex != null)
+      params.put("second_edge_index", secondEdgeIndex);
+    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params);
+  }
+
+  public float dgiBackward(int batchSize, float[] pos_x, float[] neg_x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+    Map<String, Object> params = new HashMap<String, Object>();
+    params.put("batch_size", batchSize);
+    params.put("pos_x", pos_x);
+    params.put("neg_x", neg_x);
+    params.put("feature_dim", featureDim);
+    params.put("first_edge_index", firstEdgeIndex);
+    params.put("weights", weights);
+    if (secondEdgeIndex != null)
+      params.put("second_edge_index", secondEdgeIndex);
     return Torch.gcnBackward(ptr, params);
   }
 

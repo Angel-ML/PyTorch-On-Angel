@@ -36,11 +36,11 @@ public class Torch {
   /* save module */
   public static native void save(long ptr, Map<String, Object> params);
 
-  /* graph forward */
-  public static native long[] gcnForward(long ptr, Map<String, Object> params);
-
   /* graph backward */
   public static native float gcnBackward(long ptr, Map<String, Object> params);
+
+  /* graph exec */
+  public static native Object gcnExecMethod(long ptr, String method, Map<String, Object> params);
 
   /* graph get all parameters */
   public static native float[] getParameters(long ptr);

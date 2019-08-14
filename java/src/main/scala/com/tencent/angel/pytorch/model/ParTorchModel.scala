@@ -53,43 +53,46 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     this.params = new TorchParams
     TorchModel.setPath(path)
     LibraryLoader.load
-    println(TorchModel.get().getType)
-    params.dim = TorchModel.get().getInputDim
-    TorchModelType.withName(TorchModel.get().getType) match {
+    val torchModel = TorchModel.get()
+    println(torchModel.getType)
+    params.dim = torchModel.getInputDim
+    TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
         initMats(params.dim)
 
       case TorchModelType.BIAS_WEIGHT_EMBEDDING =>
-        params.embeddingDim = TorchModel.get().getEmbeddingDim
+        params.embeddingDim = torchModel.getEmbeddingDim
         initMats(params.dim)
         initMats(params.dim, params.embeddingDim)
 
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS
            | TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD =>
-        params.embeddingDim = TorchModel.get().getEmbeddingDim
-        params.numFields = TorchModel.get().getNumFields
-        params.matSizes = TorchModel.get().getMatsSize
+        params.embeddingDim = torchModel.getEmbeddingDim
+        params.numFields = torchModel.getNumFields
+        params.matSizes = torchModel.getMatsSize
         println("matSizes is: " + params.matSizes.mkString(" "))
         initMats(params.dim)
         initMats(params.dim, params.embeddingDim)
         initMats(params.matSizes)
 
     }
+    TorchModel.addModel(torchModel)
   }
 
   /* save pytorch module */
   def saveModule(path: String, conf: Configuration) = {
-    TorchModelType.withName(TorchModel.get().getType) match {
+    val torchModel = TorchModel.get()
+    TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
         val biasBuf = makeBias(pullBias())
         val weightsBuf = makeWeights(pullWeight())
-        TorchModel.get().save(biasBuf, weightsBuf)
+        torchModel.save(biasBuf, weightsBuf)
 
       case TorchModelType.BIAS_WEIGHT_EMBEDDING =>
         val biasBuf = makeBias(pullBias())
         val weightsBuf = makeWeights(pullWeight())
         val embeddingBuf = makeEmbeddings(pullEmbeddings())
-        TorchModel.get().save(biasBuf, weightsBuf, embeddingBuf,
+        torchModel.save(biasBuf, weightsBuf, embeddingBuf,
           params.embeddingDim, params.dim.toInt)
 
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS
@@ -98,7 +101,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
         val weightsBuf = makeWeights(pullWeight())
         val embeddingBuf = makeEmbeddings(pullEmbeddings())
         val matsBuf = makeMats(pullMats())
-        TorchModel.get().save(biasBuf, weightsBuf, embeddingBuf,
+        torchModel.save(biasBuf, weightsBuf, embeddingBuf,
           params.embeddingDim, matsBuf, params.matSizes, params.dim.toInt)
 
     }
@@ -110,12 +113,13 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     savedModulePath = new Path(savedModulePath.toUri.getPath)
     val sysPerms = new FsPermission(FsPermission.createImmutable(0x1ff.toShort))
     FileSystem.mkdirs(fs, savedModulePath, sysPerms)
-    val file = new File(TorchModel.get().name() + "-model.pt")
+    val file = new File(torchModel.name() + "-model.pt")
     if(file.exists()) {
       val srcPath = new Path(file.getPath)
       val dstPath = new Path(path)
       fs.copyFromLocalFile(srcPath, dstPath)
     }
+    TorchModel.addModel(torchModel)
   }
 
 
@@ -404,24 +408,25 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
   /* optimize functions */
   def optimize(batch: Array[String]): Double = {
     TorchModel.setPath(path)
-    val tuple3 = SampleParser.parse(batch, TorchModel.get().getType)
+    val torchModel = TorchModel.get()
+    val tuple3 = SampleParser.parse(batch, torchModel.getType)
     val (coo, fields, targets) = (tuple3._1, tuple3._2, tuple3._3)
 
-    val loss = TorchModelType.withName(TorchModel.get().getType) match {
+    val loss = TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
-        optimizeBiasWeight(batch.length, coo, targets)
+        optimizeBiasWeight(torchModel, batch.length, coo, targets)
       case TorchModelType.BIAS_WEIGHT_EMBEDDING =>
-        optimizeBiasWeightEmbedding(batch.length, coo, targets)
+        optimizeBiasWeightEmbedding(torchModel, batch.length, coo, targets)
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS =>
-        optimizeBiasWeightEmbeddingMats(batch.length, coo, targets)
+        optimizeBiasWeightEmbeddingMats(torchModel, batch.length, coo, targets)
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD =>
-        optimizeBiasWeightEmbeddingMatsField(batch.length, coo, fields, targets)
+        optimizeBiasWeightEmbeddingMatsField(torchModel, batch.length, coo, fields, targets)
     }
-
+    TorchModel.addModel(torchModel)
     return loss
   }
 
-  def optimizeBiasWeight(batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
+  def optimizeBiasWeight(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
     val indices = distinctIntIndices(batch)
 
     incCallNum
@@ -440,7 +445,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
 
     // Calculate the gradients
     start = System.currentTimeMillis()
-    val loss = TorchModel.get().backward(batchSize, batch, biasBuf, weightsBuf, targets)
+    val loss = torchModel.backward(batchSize, batch, biasBuf, weightsBuf, targets)
     incCalTime(start)
 
     // Transfer the parameters formats from pytorch to angel
@@ -460,7 +465,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     return loss * batchSize
   }
 
-  def optimizeBiasWeightEmbedding(batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
+  def optimizeBiasWeightEmbedding(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
     val indices = distinctIntIndices(batch)
 
     incCallNum
@@ -479,7 +484,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
 
     // Calculate the gradients
     start = System.currentTimeMillis()
-    val loss = TorchModel.get().backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
+    val loss = torchModel.backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
       params.embeddingDim, targets)
     incCalTime(start)
 
@@ -501,7 +506,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     return loss * batchSize
   }
 
-  def optimizeBiasWeightEmbeddingMats(batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
+  def optimizeBiasWeightEmbeddingMats(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix, targets: Array[Float]): Double = {
     val indices = distinctIntIndices(batch)
 
     incCallNum
@@ -522,7 +527,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
 
     // Calculate the gradients
     start = System.currentTimeMillis()
-    val loss = TorchModel.get().backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
+    val loss = torchModel.backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
       params.embeddingDim, matsBuf, params.matSizes, targets)
     incCalTime(start)
 
@@ -545,7 +550,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     return loss * batchSize
   }
 
-  def optimizeBiasWeightEmbeddingMatsField(batchSize: Int, batch: CooLongFloatMatrix, fields: Array[Long], targets: Array[Float]): Double = {
+  def optimizeBiasWeightEmbeddingMatsField(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix, fields: Array[Long], targets: Array[Float]): Double = {
     var (start, end) = (0L, 0L)
     val indices = distinctIntIndices(batch)
     start = System.currentTimeMillis()
@@ -561,7 +566,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     val pullTime = end - start
 
     start = System.currentTimeMillis()
-    val loss = TorchModel.get().backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
+    val loss = torchModel.backward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf,
       params.embeddingDim, matsBuf, params.matSizes, fields, targets)
     end = System.currentTimeMillis()
     val gradTime = end - start
@@ -586,32 +591,34 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
 
   def predict(batch: Array[String]): (Array[Float], Array[Float]) = {
     TorchModel.setPath(path)
-    val tuple3 = SampleParser.parse(batch, TorchModel.get().getType)
+    val torchModel = TorchModel.get()
+    val tuple3 = SampleParser.parse(batch, torchModel.getType)
     val (coo, fields, targets) = (tuple3._1, tuple3._2, tuple3._3)
 
-    TorchModelType.withName(TorchModel.get().getType) match {
+    TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
-        return (targets, predictBiasWeight(batch.length, coo))
+        return (targets, predictBiasWeight(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING =>
-        return (targets, predictBiasWeightEmbedding(batch.length, coo))
+        return (targets, predictBiasWeightEmbedding(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS =>
-        return (targets, predictBiasWeightEmbeddingMats(batch.length, coo))
+        return (targets, predictBiasWeightEmbeddingMats(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD =>
-        return (targets, predictBiasWeightEmbeddingMatsField(batch.length, coo, fields))
+        return (targets, predictBiasWeightEmbeddingMatsField(torchModel, batch.length, coo, fields))
     }
+    TorchModel.addModel(torchModel)
     return null
   }
 
-  def predictBiasWeight(batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
+  def predictBiasWeight(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
     val indices = distinctIntIndices(batch)
     val bias = pullBias()
     val weights = pullWeight(indices)
     val biasBuf = makeBias(bias)
     val weightsBuf = makeWeights(weights, batch.getColIndices)
-    return TorchModel.get().forward(batchSize, batch, biasBuf, weightsBuf)
+    return torchModel.forward(batchSize, batch, biasBuf, weightsBuf)
   }
 
-  def predictBiasWeightEmbedding(batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
+  def predictBiasWeightEmbedding(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
     val indices = distinctIntIndices(batch)
     val bias = pullBias()
     val weights = pullWeight(indices)
@@ -619,10 +626,10 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     val biasBuf = makeBias(bias)
     val weightsBuf = makeWeights(weights, batch.getColIndices)
     val embeddingBuf = makeEmbeddings(embedding, batch.getColIndices)
-    return TorchModel.get().forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim)
+    return torchModel.forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim)
   }
 
-  def predictBiasWeightEmbeddingMats(batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
+  def predictBiasWeightEmbeddingMats(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix): Array[Float] = {
     val indices = distinctIntIndices(batch)
     val bias = pullBias()
     val weights = pullWeight(indices)
@@ -632,11 +639,11 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     val weightsBuf = makeWeights(weights, batch.getColIndices)
     val embeddingBuf = makeEmbeddings(embedding, batch.getColIndices)
     val matsBuf = makeMats(mats)
-    return TorchModel.get().forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim,
+    return torchModel.forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim,
       matsBuf, params.matSizes)
   }
 
-  def predictBiasWeightEmbeddingMatsField(batchSize: Int, batch: CooLongFloatMatrix, fields: Array[Long]): Array[Float] = {
+  def predictBiasWeightEmbeddingMatsField(torchModel: TorchModel, batchSize: Int, batch: CooLongFloatMatrix, fields: Array[Long]): Array[Float] = {
     val indices = distinctIntIndices(batch)
     val bias = pullBias()
     val weights = pullWeight(indices)
@@ -646,7 +653,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     val weightsBuf = makeWeights(weights, batch.getColIndices)
     val embeddingBuf = makeEmbeddings(embedding, batch.getColIndices)
     val matsBuf = makeMats(mats)
-    return TorchModel.get().forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim,
+    return torchModel.forward(batchSize, batch, biasBuf, weightsBuf, embeddingBuf, params.embeddingDim,
       matsBuf, params.matSizes, fields)
   }
 
@@ -684,7 +691,8 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     }
 
     TorchModel.setPath(path)
-    TorchModelType.withName(TorchModel.get().getType) match {
+    val torchModel = TorchModel.get()
+    TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
         addBiasCtx()
         addWeightsCtx()
@@ -701,6 +709,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     }
 
     PSContext.instance().save(modelSaveCtx)
+    TorchModel.addModel(torchModel)
   }
 
   def load(input: String): Unit = {
@@ -731,7 +740,8 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     }
 
     TorchModel.setPath(path)
-    TorchModelType.withName(TorchModel.get().getType) match {
+    val torchModel = TorchModel.get()
+    TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
         addBiasCtx()
         addWeightsCtx()
@@ -748,6 +758,7 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
     }
 
     PSContext.instance().load(modelLoadCtx)
+    TorchModel.addModel(torchModel)
   }
 
   /* time calculate functions */

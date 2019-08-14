@@ -70,7 +70,7 @@ public class SampleParser {
         String[] fkv = parts[j].split(":");
         long field = Long.parseLong(fkv[0]);
         long key = Long.parseLong(fkv[1]);
-        float val = Long.parseLong(fkv[2]);
+        float val = Float.parseFloat(fkv[2]);
 
         rows.add(index);
         fields.add(field);
@@ -88,9 +88,9 @@ public class SampleParser {
   }
 
   public static Tuple2<Long, IntFloatVector> parseNodeFeature(String line, int dim, String format) {
-    if (format == "sparse")
+    if (format.equals("sparse"))
       return parseSparseNodeFeature(line, dim);
-    if (format == "dense")
+    if (format.equals("dense"))
       return parseDenseNodeFeature(line, dim);
     throw new AngelException("data format should be sparse or dense");
   }
@@ -130,5 +130,42 @@ public class SampleParser {
 
     IntFloatVector feature = VFactory.denseFloatVector(values);
     return new Tuple2<Long, IntFloatVector>(node, feature);
+  }
+
+  public static IntFloatVector parseFeature(String line, int dim, String format) {
+    if (format.equals("sparse"))
+      return parseSparseIntFloat(line, dim);
+    if (format.equals("dense"))
+      return parseDenseIntFloat(line, dim);
+
+    throw new AngelException("format should be sparse or dense");
+  }
+
+  public static IntFloatVector parseSparseIntFloat(String line, int dim) {
+    String[] parts = line.split(" ");
+
+    int[] keys = new int[parts.length];
+    float[] vals = new float[parts.length];
+    for (int i = 0; i < parts.length; i++) {
+      String[] kv = parts[i].split(":");
+      keys[i] = Integer.parseInt(kv[0]);
+      if (keys[i] >= dim)
+        throw new AngelException("feature index should be less than dim");
+      vals[i] = Float.parseFloat(kv[1]);
+    }
+
+    return VFactory.sortedFloatVector(dim, keys, vals);
+  }
+
+  public static IntFloatVector parseDenseIntFloat(String line, int dim) {
+    String[] parts = line.split(" ");
+    if (parts.length != dim)
+      throw new AngelException("number elements of feature should be equal with dim");
+
+    float[] vals = new float[parts.length];
+    for (int i = 0; i < parts.length; i++)
+      vals[i] = Float.parseFloat(parts[i]);
+
+    return VFactory.denseFloatVector(vals);
   }
 }

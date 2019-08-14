@@ -26,6 +26,8 @@ object ClusterExample {
     val modulePath = params.getOrElse("modulePath", "")
     val action = params.getOrElse("action", "train")
     val predictOutput = params.getOrElse("predictOutput", "")
+    val partitionNum = params.getOrElse("partitionNum", "100").toInt
+
 
     val path = Paths.get(".").toAbsolutePath.toString
     val dir = new File(path)
@@ -39,7 +41,7 @@ object ClusterExample {
     PSContext.getOrCreate(sc)
 
     if (action.equals("train")) {
-      val data = sc.textFile(input)
+      val data = sc.textFile(input).coalesce(partitionNum)
       val splits = data.randomSplit(Array(0.9, 0.1))
       val (train, test) = (splits(0), splits(1))
       train.persist(StorageLevel.DISK_ONLY)
@@ -61,20 +63,19 @@ object ClusterExample {
         val scores = test.mapPartitions {
           case iterator =>
             iterator.sliding(batchSize, batchSize)
-              .map(batch => (model.predict(batch.toArray)))
+              .map(batch => model.predict(batch.toArray))
+
               .flatMap(f => f._1.zip(f._2))
               .map(f => (f._1.toDouble, f._2.toDouble))
         }
 
         val auc = new AUC().calculate(scores)
-
         val epochTime = System.currentTimeMillis() - epochStartTime
         println(s"epoch=$epoch loss=${lossSum / size} auc=$auc time=${epochTime.toFloat / 1000}s")
       }
 
       if (modelPath.length > 0)
         model.save(modelPath)
-
       if (modulePath.length > 0)
         model.saveModule(modulePath, SparkHadoopUtil.get.newConfiguration(sc.getConf))
     } else {
@@ -82,7 +83,8 @@ object ClusterExample {
         println("Load model path not set, please check it.")
         System.exit(-1)
       }
-      val predictData = sc.textFile(input)
+      val predictData = sc.textFile(input).coalesce(partitionNum)
+
       val optim = new AsyncAdam(stepSize)
       val model = new ParTorchModel(optim, torchModelPath)
       model.init()
@@ -91,7 +93,9 @@ object ClusterExample {
         case iterator =>
           LibraryLoader.load
           iterator.sliding(batchSize, batchSize)
-            .map(batch => (model.predict(batch.toArray)))
+
+            .map(batch => model.predict(batch.toArray))
+
             .flatMap(f => f._1.zip(f._2))
             .map(f => (f._1.toDouble, f._2.toDouble))
       }
