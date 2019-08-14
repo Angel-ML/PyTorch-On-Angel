@@ -103,10 +103,6 @@ class GCNConv2(torch.jit.ScriptModule):
         edge_weight = torch.ones((edge_index.size(1), ),
             device=edge_index.device)
 
-        # no need to add self-loops
-        # edge_index, edge_weight = add_remaining_self_loops(
-        #     edge_index, edge_weight, fill_value, num_nodes)
-
         row, col = edge_index[0], edge_index[1]
         deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
         deg_inv_sqrt = deg.pow(-0.5)

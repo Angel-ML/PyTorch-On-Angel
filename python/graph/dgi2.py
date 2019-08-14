@@ -1,0 +1,66 @@
+import torch
+import torch.nn.functional as F
+from torch.nn import Parameter
+from nn.conv import SAGEConv3
+
+class DGITwoOrder(torch.jit.ScriptModule):
+
+    def __init__(self, n_in, n_h1, n_h2):
+        super(DGITwoOrder, self).__init__()
+        self.gcn1 = SAGEConv3(n_in, n_h1)
+        self.gcn2 = SAGEConv3(n_h1, n_h2)
+        self.weight = Parameter(torch.Tensor(n_h2, n_h2))
+        self.prelu1 = Parameter(torch.Tensor(n_h1).fill_(0.25))
+        self.prelu2 = Parameter(torch.Tensor(n_h2).fill_(0.25))
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        torch.nn.init.xavier_uniform_(self.weight)
+
+    @torch.jit.script_method
+    def forward_(self, pos_x, neg_x, first_edge_index, second_edge_index):
+        # type: (Tensor, Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor, Tensor]
+        pos_x = F.prelu(self.gcn1(pos_x, second_edge_index), self.prelu1)
+        pos_z = F.prelu(self.gcn2(pos_x, first_edge_index), self.prelu2)
+        neg_x = F.prelu(self.gcn1(neg_x, second_edge_index), self.prelu1)
+        neg_z = F.prelu(self.gcn2(neg_x, first_edge_index), self.prelu2)
+        summary = torch.sigmoid(torch.mean(pos_z, dim=0))
+        return pos_z, neg_z, summary
+
+    @torch.jit.script_method
+    def loss(self, pos_z, neg_z, summary):
+        r"""Computes the mutual information maximization objective."""
+        pos_loss = -torch.log(
+            self.discriminate(pos_z, summary, sigmoid=True) + 1e-15).mean()
+        neg_loss = -torch.log(
+            1 - self.discriminate(neg_z, summary, sigmoid=True) + 1e-15).mean()
+
+        return pos_loss + neg_loss
+
+    @torch.jit.script_method
+    def discriminate(self, z, summary, sigmoid=True):
+        # type: (Tensor, Tensor, bool) -> Tensor
+        r"""Given the patch-summary pair :obj:`z` and :obj:`summary`, computes
+        the probability scores assigned to this patch-summary pair.
+
+        Args:
+            z (Tensor): The latent space.
+            sigmoid (bool, optional): If set to :obj:`False`, does not apply
+                the logistic sigmoid function to the output.
+                (default: :obj:`True`)
+        """
+        value = torch.matmul(z, torch.matmul(self.weight, summary))
+        return torch.sigmoid(value) if sigmoid else value
+ 
+    @torch.jit.script_method
+    def embedding_(self, x, first_edge_index, second_edge_index):
+        x = F.prelu(self.gcn1(x, second_edge_index), self.prelu1)
+        x = F.prelu(self.gcn2(x, first_edge_index), self.prelu2)
+        return x
+
+if __name__ == '__main__':
+    # dgi2 = DGITwoOrder(1433, 128, 512)
+    # dgi2.save('dgi2_sage.pt')
+    dgi2 = DGITwoOrder(602, 64, 128)
+    dgi2.save('dgi2_sage_reddit.pt')
