@@ -114,6 +114,11 @@ Here are the submit example for deepfm.
           modulePath:$output \
    ```
 
+### Algorithms
+Currently, Pytorch on Angel supports a series of recommendation and deep graph convolution network algorithms.
+
+1. [Recommendation Algorithms](./docs/recommendation.md)
+2. [Graph Algorithms](./docs/graph.md)
 
 
 [1]: ./docs/img/pytorch_on_angel_framework.png

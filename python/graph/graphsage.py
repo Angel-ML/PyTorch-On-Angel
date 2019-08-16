@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
+import argparse
+
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
@@ -73,12 +77,33 @@ class SAGETwoSoftmax(torch.jit.ScriptModule):
         y_true = y_true.view(-1).to(torch.long)
         return y_pred.max(1)[1].eq(y_true).sum().item() / y_pred.size(0)
 
+FLAGS = None
+
+def main():
+    sage = SAGETwoSoftmax(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.output_dim)
+    sage.save(FLAGS.output_file)
+
 if __name__ == '__main__':
-    sage = SAGETwoSoftmax(233, 128, 2)
-    sage.save('sage5_twoorder_eular.pt')
-    # sage = SAGETwoSoftmax(1433, 128, 7)
-    # sage.save('sage5_twoorder_cora.pt')
-    # sage = SAGETwoSoftmax(602, 128, 41) # reddit
-    # sage.save('sage_twoorder_reddit.pt')
-    # sage = SAGETwoSoftmax(56, 64, 2) # qq
-    # sage.save('sage_twoorder_qq.pt')
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--input_dim",
+        type=int,
+        default=-1,
+        help="input dimention of node features")
+    parser.add_argument(
+        "--hidden_dim",
+        type=int,
+        default=-1,
+        help="hidden dimension of graphsage convolution layer")
+    parser.add_argument(
+        "--output_dim",
+        type=int,
+        default=-1,
+        help="output dimension, the number of labels")
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        default="graphsage.pt",
+        help="output file name")
+    FLAGS, unparsed = parser.parse_known_args()
+    main()
