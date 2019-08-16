@@ -15,7 +15,7 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
-from nn.conv import GCNConv, SAGEConv3, GCNConv2, SAGEConv4
+from nn.conv import SAGEConv3, GCNConv2
 
 class DGI(torch.jit.ScriptModule):
     def __init__(self, n_in, n_h):
