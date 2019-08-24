@@ -19,7 +19,7 @@ The methods are similar for other algorithms.
 
 ### Example of DeepFM
 
-1. ** Generate pytorch script model**
+1. **Generate pytorch script model**
     First, go to directory of python/recommendation and execute the following command:
     ```$xslt
     python deepfm.py --input_dim 148 --n_fields 13 --embedding_dim 10 --fc_dims 10 5 1
@@ -33,14 +33,14 @@ The methods are similar for other algorithms.
 
     This python script will generate a TorchScript model with the structure of dataflow graph for deepfm. This file is named ``deepfm.pt``.
 
-2. ** Preparing the input data**
+2. **Preparing the input data**
     The input data of DeepFM should be libffm format. Each line of the input data represents one data sample.
     ```
     label field1:feature1:value1 field2:feature2:value2
     ```
     In Pytorch on angel, multi-hot field is allowed, which means some field can be appeared multi-times in one data example.
 
-3. ** Training model**
+3. **Training model**
     After obtaining the model file (deepfm.pt) and the input data, we can submit a task through Spark on Angel to train the model. The command is:
     ```$xslt
     source ./spark-on-angel-env.sh  
