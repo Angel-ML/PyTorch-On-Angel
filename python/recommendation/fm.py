@@ -85,8 +85,8 @@ class FactorizationMachine(torch.jit.ScriptModule):
         return second
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embeddings):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embeddings):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         second = self.second_order(batch_size, index, values, embeddings)
         return torch.sigmoid(first + second)
@@ -96,7 +96,7 @@ class FactorizationMachine(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_second = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values, self.bias, batch_first, batch_second)
+        return self.forward_(batch_size, index, values, self.bias, batch_first, batch_second)
 
     @torch.jit.script_method
     def loss(self, output, targets):

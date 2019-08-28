@@ -123,8 +123,8 @@ class xDeepFM(torch.jit.ScriptModule):
 
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embeddings, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embeddings, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         cin_index = len(self.cin_dims) * 2
         cin = self.cin(batch_size, embeddings, mats[0:cin_index])
@@ -140,7 +140,7 @@ class xDeepFM(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         emb = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values,
+        return self.forward_(batch_size, index, values,
                              self.bias, batch_first, emb, self.mats)
 
     @torch.jit.script_method

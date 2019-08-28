@@ -104,8 +104,8 @@ class DeepFM(torch.jit.ScriptModule):
         return output.view(-1)
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embeddings, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embeddings, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
 
         first = self.first_order(batch_size, index, values, bias, weights)
         second = self.second_order(batch_size, index, values, embeddings)
@@ -118,7 +118,7 @@ class DeepFM(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_second = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values,
+        return self.forward_(batch_size, index, values,
                              self.bias, batch_first, batch_second, self.mats)
 
     @torch.jit.script_method

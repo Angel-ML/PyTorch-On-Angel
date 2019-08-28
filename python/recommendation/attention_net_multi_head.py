@@ -1,20 +1,22 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
 #!/usr/bin/env python
 
 from __future__ import print_function
+
+import argparse
 
 import torch
 import torch.nn.functional as F
@@ -127,8 +129,8 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         return e.view(-1)
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embedding, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embedding, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         higher = self.higher_order(batch_size, embedding, self.num_multi_head, self.top_k,
                                    self.n_fields, self.num_attention_layers, mats)
@@ -138,7 +140,7 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_embedding = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values, self.bias, batch_first,
+        return self.forward_(batch_size, index, values, self.bias, batch_first,
                              batch_embedding, self.mats)
 
     @torch.jit.script_method
@@ -154,6 +156,66 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         return "AttentionNetMultiHead"
 
 
-if __name__ == '__main__':
-    attention = AttentionNetMultiHead()
+FLAGS = None
+
+
+def main():
+    attention = AttentionNetMultiHead(
+        FLAGS.input_dim,
+        FLAGS.n_fields,
+        FLAGS.embedding_dim,
+        FLAGS.num_multi_head,
+        FLAGS.top_k,
+        FLAGS.num_attention_layers,
+        FLAGS.fc_dims)
     attention.save('attention_net_multi_head.pt')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.register("type", "bool", lambda v: v.lower() == "true")
+    parser.add_argument(
+        "--input_dim",
+        type=int,
+        default=-1,
+        help="data input dim."
+    )
+    parser.add_argument(
+        "--n_fields",
+        type=int,
+        default=-1,
+        help="data num fields."
+    )
+    parser.add_argument(
+        "--embedding_dim",
+        type=int,
+        default=-1,
+        help="embedding dim."
+    )
+    parser.add_argument(
+        "--num_multi_head",
+        type=int,
+        default=-1,
+        help="num multi head."
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=-1,
+        help="top k."
+    )
+    parser.add_argument(
+        "--num_attention_layers",
+        type=int,
+        default=-1,
+        help="num attention layers."
+    )
+    parser.add_argument(
+        "--fc_dims",
+        nargs="+",
+        type=int,
+        default=-1,
+        help="fc layers dim list."
+    )
+    FLAGS, unparsed = parser.parse_known_args()
+    main()

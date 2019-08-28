@@ -99,8 +99,8 @@ class PNN(torch.jit.ScriptModule):
         return output.view(-1)  # [b * 1]
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embeddings, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embeddings, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         product = self.product(batch_size, embeddings, mats[0:3])
         output = self.deep(batch_size, product, mats[3:])
@@ -111,7 +111,7 @@ class PNN(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         emb = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values,
+        return self.forward_(batch_size, index, values,
                              self.bias, batch_first, emb, self.mats)
 
     @torch.jit.script_method

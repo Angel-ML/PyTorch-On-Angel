@@ -107,8 +107,8 @@ class AttentionNet(torch.jit.ScriptModule):
         return e.view(-1)
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embedding, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embedding, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         higher = self.higher_order(batch_size, embedding, mats)
         return torch.sigmoid(first + higher)
@@ -118,7 +118,7 @@ class AttentionNet(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_embedding = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values,
+        return self.forward_(batch_size, index, values,
                              self.bias, batch_first, batch_embedding, self.mats)
 
     @torch.jit.script_method

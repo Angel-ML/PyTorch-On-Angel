@@ -90,8 +90,8 @@ class AttentionFM(torch.jit.ScriptModule):
         return attention_out
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weights, embeddings, mats):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weights, embeddings, mats):
+        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
 
         n_fields = (int)(embeddings.size(0) / batch_size)
         embedding_dim = embeddings.size(1)
@@ -105,7 +105,7 @@ class AttentionFM(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_second = F.embedding(feats, self.embedding)
-        return self.forward_(batch_size, index, feats, values,
+        return self.forward_(batch_size, index, values,
                              self.bias, batch_first, batch_second, self.mats)
 
     @torch.jit.script_method

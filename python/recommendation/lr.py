@@ -41,8 +41,8 @@ class LogisticRegression(torch.jit.ScriptModule):
 
 
     @torch.jit.script_method
-    def forward_(self, batch_size, index, feats, values, bias, weight):
-        # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    def forward_(self, batch_size, index, values, bias, weight):
+        # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         size = batch_size
         index = index.view(-1)
         values = values.view(1, -1)
@@ -57,7 +57,7 @@ class LogisticRegression(torch.jit.ScriptModule):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         weight = F.embedding(feats, self.weights)
         bias = self.bias
-        return self.forward_(batch_size, index, feats, values, bias, weight)
+        return self.forward_(batch_size, index, values, bias, weight)
 
     @torch.jit.script_method
     def loss(self, output, targets):
