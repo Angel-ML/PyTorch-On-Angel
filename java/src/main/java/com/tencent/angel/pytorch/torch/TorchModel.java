@@ -56,7 +56,7 @@ public class TorchModel implements Serializable {
       model.init(path);
       modelsQueue.put(model);
       counter.addAndGet(1);
-      if (counter.get() > cores)
+      if (counter.get() > cores + 2)
         throw new AngelException("The size of torch model exceeds the cores");
     }
     return modelsQueue.take();
