@@ -613,12 +613,16 @@ class ParTorchModel(optim: AsyncOptim, path: String) extends Serializable {
 
     TorchModelType.withName(torchModel.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
+        TorchModel.addModel(torchModel)
         return (targets, predictBiasWeight(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING =>
+        TorchModel.addModel(torchModel)
         return (targets, predictBiasWeightEmbedding(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS =>
+        TorchModel.addModel(torchModel)
         return (targets, predictBiasWeightEmbeddingMats(torchModel, batch.length, coo))
       case TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD =>
+        TorchModel.addModel(torchModel)
         return (targets, predictBiasWeightEmbeddingMatsField(torchModel, batch.length, coo, fields))
     }
     TorchModel.addModel(torchModel)
