@@ -6,7 +6,8 @@
 
   <groupId>com.tencent.angel</groupId>
   <artifactId>pytorch-on-angel</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.1.1-SNAPSHOT</version>
+  <name>pytorch-on-angel</name>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -127,6 +128,15 @@
       </plugin>
     </plugins>
   </build>
-
+    <distributionManagement>
+        <snapshotRepository>
+            <id>tx_angel</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>tx_angel</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
 </project>
