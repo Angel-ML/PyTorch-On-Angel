@@ -85,7 +85,7 @@ public class SampleParser {
       for (int j = 1; j < parts.length; j++) {
         String[] fkv = parts[j].split(":");
         long field = Long.parseLong(fkv[0]);
-        long key = Long.parseLong(fkv[1]);
+        long key = Long.parseLong(fkv[1]) - 1;
         float val = Float.parseFloat(fkv[2]);
 
         rows.add(index);
