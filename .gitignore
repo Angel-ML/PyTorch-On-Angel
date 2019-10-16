@@ -7,3 +7,4 @@ cpp/cmake-build-debug
 cpp/.idea
 python/__pycache__
 *.pyc
+.idea
