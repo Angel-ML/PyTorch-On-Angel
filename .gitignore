@@ -8,3 +8,5 @@ cpp/.idea
 python/__pycache__
 *.pyc
 .idea
+output
+dist
