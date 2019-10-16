@@ -139,5 +139,15 @@
             </snapshots>
         </repository>
     </repositories>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>tx_angel</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>tx_angel</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+  </distributionManagement>
 
 </project>
