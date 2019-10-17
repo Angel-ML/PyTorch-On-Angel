@@ -32,7 +32,6 @@ RUN curl -fsSL --insecure -o /tmp/cmake.tar.gz https://cmake.org/files/v3.13/cma
 #######################
 WORKDIR /opt
 ENV LIBTORCH_URL=https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.2.0%2Bcpu.zip
-#ENV LIBTORCH_URL=https://download.pytorch.org/libtorch/nightly/cpu/libtorch-shared-with-deps-latest.zip
 RUN curl -fsSL --insecure -o libtorch.zip  $LIBTORCH_URL \
     && unzip -q libtorch.zip \
     && rm libtorch.zip
@@ -42,18 +41,16 @@ ENV TORCH_HOME=/opt/libtorch
 #####################
 #  Install PyTorch  #
 #####################
-#RUN pip install --no-cache-dir numpy==1.16.4 \
-    #&& pip install --no-cache-dir https://download.pytorch.org/whl/cpu/torch-1.0.1.post2-cp27-cp27mu-linux_x86_64.whl \
-    #&& pip install --no-cache-dir torchvision==0.4.0
 WORKDIR /tmp
-#RUN curl -fsSL --insecure -o anaconda.sh https://repo.anaconda.com/archive/Anaconda3-5.2.0-Linux-x86_64.sh \
 RUN curl -fsSL --insecure -o anaconda.sh https://repo.anaconda.com/miniconda/Miniconda3-4.7.10-Linux-x86_64.sh \
     && /bin/bash anaconda.sh -b -p /opt/conda \
     && rm anaconda.sh \
     && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
     && echo ". /opt/conda/etc/profile.d/conda.sh" >> "$HOME"/.bashrc \
     && echo "conda activate base" >> "$HOME"/.bashrc \
-    && /opt/conda/bin/conda install -y pytorch-cpu torchvision-cpu -c pytorch
+    && /opt/conda/bin/conda install -y pytorch=1.2.0 torchvision=0.4.0 cpuonly=1.0 -c pytorch
+
+ENV PATH /opt/conda/bin/:$PATH
 
 ########################################################################################################################
 #                                                     JAVA BUILDER                                                     #
