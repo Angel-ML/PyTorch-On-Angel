@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 
 export IMAGE_NAME=pytorch_on_angel
 
