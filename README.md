@@ -16,13 +16,13 @@ Pytorch on Angel's architecture design consists of three modules:
 
 ### Compilation & Deployment Instructions by Docker
 
-To use Pytorch on Angel, we need three components: .jar file compiled by this repo, a set of shared libraries for pytorch c++ backend, and finally the pytorch script module.
+To use Pytorch on Angel, we need three components: .jar file with a set of shared libraries for pytorch c++ backend compiled by this repo, and the pytorch script module.
 
-#### Compile .jar and the shared libraries
+#### Compile .jar and the shared c++ libraries
 
 ```bash
 # Below script will build the jar files and bunlde the shared c++ libraries in containers
-# The generated files are in ./dist
+# The generated files *.jar and angel_libtorch.zip are in ./dist
 ./build.sh
 ```
 
@@ -30,7 +30,7 @@ To use Pytorch on Angel, we need three components: .jar file compiled by this re
 
 ```bash
 # We have implemented some algorithms in the python/recommendation under the root directory
-# Below script will generate a deepfm model in ./dist
+# Below script will generate a deepfm model deepfm.pt in ./dist
 ./gen_pt_model.sh python/recommendation/deepfm.py --input_dim 148 --n_fields 13 --embedding_dim 10 --fc_dims 10 5 1
 ```
 
