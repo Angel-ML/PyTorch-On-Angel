@@ -5,3 +5,6 @@ tmp
 README.md
 Dockerfile*
 docker-compose*
+build.sh
+dist/
+output

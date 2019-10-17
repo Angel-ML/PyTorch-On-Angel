@@ -82,9 +82,13 @@ RUN apt-get update  \
 
 WORKDIR /app
 
-COPY ./cpp /app
+COPY ./cpp ./
 
-RUN ./build.sh && cp ./out/*.so "$TORCH_HOME"/lib && zip -r /angel_libtorch.zip "$TORCH_HOME"/lib
+RUN ./build.sh \
+    && cp ./out/*.so "$TORCH_HOME"/lib \
+    && cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 "$TORCH_HOME"/lib \
+    && ln -s "$TORCH_HOME"/lib libtorch \
+    && zip -qr /angel_libtorch.zip libtorch
 
 ########################################################################################################################
 #                                                       Artifacts                                                      #
@@ -97,5 +101,4 @@ COPY --from=JAVA_BUILDER /app/target/*.jar ./
 
 VOLUME /output
 
-RUN ls /dist
 CMD [ "/bin/sh", "-c", "cp ./* /output" ]
