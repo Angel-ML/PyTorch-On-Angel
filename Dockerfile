@@ -47,10 +47,17 @@ RUN curl -fsSL --insecure -o anaconda.sh https://repo.anaconda.com/miniconda/Min
     && rm anaconda.sh \
     && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
     && echo ". /opt/conda/etc/profile.d/conda.sh" >> "$HOME"/.bashrc \
-    && echo "conda activate base" >> "$HOME"/.bashrc \
-    && /opt/conda/bin/conda install -y pytorch=1.2.0 torchvision=0.4.0 cpuonly=1.0 -c pytorch
+    && echo "conda activate base" >> "$HOME"/.bashrc
 
 ENV PATH /opt/conda/bin/:$PATH
+
+RUN /opt/conda/bin/conda install -yq \
+      -c pytorch \
+      pytorch=1.2.0 \
+      torchvision=0.4.0 \
+      cpuonly=1.0  \
+    && /opt/conda/bin/conda clean -yq --all
+
 
 ########################################################################################################################
 #                                                     JAVA BUILDER                                                     #
