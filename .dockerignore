@@ -1,0 +1,10 @@
+.git*
+docs/
+tmp
+*.log
+README.md
+Dockerfile*
+docker-compose*
+build.sh
+dist/
+output

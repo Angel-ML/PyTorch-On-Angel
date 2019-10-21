@@ -14,8 +14,27 @@ Pytorch on Angel's architecture design consists of three modules:
   - **angel ps**: provides a common Parameter Server (PS) service, responsible for distributed model storage, communication synchronization and coordination of computing.
   - **spark executor**: the worker process is responsible for data processing、load pytorch script module and communicate with the `Angel PS Server`to complete model training and prediction, especially pytorch c++ backend runs in native mode for actual computing backend.
 
+### Compilation & Deployment Instructions by Docker
 
-### Compilation & Deployment Instructions
+To use Pytorch on Angel, we need three components: .jar file with a set of shared libraries for pytorch c++ backend compiled by this repo, and the pytorch script module.
+
+#### Compile .jar and the shared c++ libraries
+
+```bash
+# Below script will build the jar files and bunlde the shared c++ libraries in containers
+# The generated files *.jar and angel_libtorch.zip are in ./dist
+./build.sh
+```
+
+#### Generate a pytorch script model
+
+```bash
+# We have implemented some algorithms in the python/recommendation under the root directory
+# Below script will generate a deepfm model deepfm.pt in ./dist
+./gen_pt_model.sh python/recommendation/deepfm.py --input_dim 148 --n_fields 13 --embedding_dim 10 --fc_dims 10 5 1
+```
+
+### Compilation & Deployment Instructions Manually
 
 #### Install Pytorch
 
