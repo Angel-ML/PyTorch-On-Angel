@@ -16,9 +16,6 @@
  */
 package com.tencent.angel.pytorch.examples
 
-import java.io.File
-import java.nio.file.Paths
-
 import com.tencent.angel.pytorch.model.ParTorchModel
 import com.tencent.angel.pytorch.native.LibraryLoader
 import com.tencent.angel.pytorch.optim.AsyncAdam
@@ -43,13 +40,6 @@ object ClusterExample {
     val action = params.getOrElse("action", "train")
     val predictOutput = params.getOrElse("predictOutput", "")
     val partitionNum = params.getOrElse("partitionNum", "100").toInt
-
-
-    val path = Paths.get(".").toAbsolutePath.toString
-    val dir = new File(path)
-    dir.listFiles().foreach(f => println(f))
-    val torchDir = new File(path + "/torch/torch-lib")
-    torchDir.listFiles().foreach(f => println(f))
 
     val conf = new SparkConf()
     val sc = new SparkContext(conf)

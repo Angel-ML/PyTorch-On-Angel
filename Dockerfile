@@ -91,8 +91,8 @@ COPY ./cpp ./
 RUN ./build.sh \
     && cp ./out/*.so "$TORCH_HOME"/lib \
     && cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 "$TORCH_HOME"/lib \
-    && ln -s "$TORCH_HOME"/lib libtorch \
-    && zip -qr /angel_libtorch.zip libtorch
+    && ln -s "$TORCH_HOME"/lib torch-lib \
+    && zip -qr /torch.zip torch-lib
 
 ########################################################################################################################
 #                                                       Artifacts                                                      #
@@ -100,7 +100,7 @@ RUN ./build.sh \
 FROM alpine:3.10 as ARTIFACTS
 
 WORKDIR /dist
-COPY --from=CPP_BUILDER /angel_libtorch.zip ./
+COPY --from=CPP_BUILDER /torch.zip ./
 COPY --from=JAVA_BUILDER /app/target/*.jar ./
 
 VOLUME /output
