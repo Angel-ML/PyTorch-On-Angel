@@ -16,11 +16,11 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
+import java.util.{HashMap => JHashMap, Map => JMap}
+
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList, LongOpenHashSet}
-
-import scala.collection.mutable.ArrayBuffer
 
 private[gcn]
 class DGIPartition(index: Int,
@@ -32,45 +32,15 @@ class DGIPartition(index: Int,
   GNNPartition(index, keys, indptr, neighbors, torchModelPath, useSecondOrder) {
 
   override
-  def trainEpoch(curEpoch: Int,
-                 batchSize: Int,
-                 model: GNNPSModel,
+  def makeParams(batchIdx: Array[Int],
+                 numSample: Int,
                  featureDim: Int,
-                 optim: AsyncOptim,
-                 numSample: Int): (Double, Long) = {
+                 model: GNNPSModel,
+                 isTraining: Boolean = true): JMap[String, Object] = {
+    val batchKeys = new LongOpenHashSet()
     val index = new Long2IntOpenHashMap()
     val srcs = new LongArrayList()
     val dsts = new LongArrayList()
-    val batchKeys = new LongOpenHashSet()
-    val batchIterator = keys.indices.sliding(batchSize, batchSize)
-    var lossSum = 0.0
-    TorchModel.setPath(torchModelPath)
-    val torch = TorchModel.get()
-    while (batchIterator.hasNext) {
-      val batch = batchIterator.next().toArray
-      val loss = trainBatch(batch, model, featureDim, optim, numSample,
-        srcs, dsts, batchKeys, index, torch)
-      lossSum += loss * batch.length
-      srcs.clear()
-      dsts.clear()
-      batchKeys.clear()
-      index.clear()
-    }
-
-    TorchModel.addModel(torch)
-    (lossSum, keys.length)
-  }
-
-  def trainBatch(batchIdx: Array[Int],
-                 model: GNNPSModel,
-                 featureDim: Int,
-                 optim: AsyncOptim,
-                 numSample: Int,
-                 srcs: LongArrayList,
-                 dsts: LongArrayList,
-                 batchKeys: LongOpenHashSet,
-                 index: Long2IntOpenHashMap,
-                 torch: TorchModel): Double = {
 
     for (idx <- batchIdx) {
       batchKeys.add(keys(idx))
@@ -82,13 +52,58 @@ class DGIPartition(index: Int,
       index, numSample, model, useSecondOrder)
 
     val posx = MakeFeature.makeFeatures(index, featureDim, model)
-    val negx = MakeFeature.sampleFeatures(index.size(), featureDim, model)
-    assert(posx.length == negx.length)
+    val negx = if (isTraining) MakeFeature.sampleFeatures(index.size(), featureDim, model) else null
+    if (isTraining)
+      assert(posx.length == negx.length)
+
+    val params = new JHashMap[String, Object]()
+    params.put("first_edge_index", first)
+    if (second != null)
+      params.put("second_edge_index", second)
+    if (isTraining) {
+      params.put("pos_x", posx)
+      params.put("neg_x", negx)
+    } else
+      params.put("x", posx)
+    params.put("batch_size", new Integer(batchIdx.length))
+    params.put("feature_dim", new Integer(featureDim))
+    params
+  }
+
+  override
+  def trainEpoch(curEpoch: Int,
+                 batchSize: Int,
+                 model: GNNPSModel,
+                 featureDim: Int,
+                 optim: AsyncOptim,
+                 numSample: Int): (Double, Long, Int) = {
+    val batchIterator = keys.indices.sliding(batchSize, batchSize)
+    var lossSum = 0.0
+    TorchModel.setPath(torchModelPath)
+    val torch = TorchModel.get()
+    var numStep = 0
+    while (batchIterator.hasNext) {
+      val batch = batchIterator.next().toArray
+      val loss = trainBatch(batch, model, featureDim, optim, numSample, torch)
+      lossSum += loss * batch.length
+      numStep += 1
+    }
+
+    TorchModel.put(torch)
+    (lossSum, keys.length, numStep)
+  }
+
+  def trainBatch(batchIdx: Array[Int],
+                 model: GNNPSModel,
+                 featureDim: Int,
+                 optim: AsyncOptim,
+                 numSample: Int,
+                 torch: TorchModel): Double = {
+
+    val param = makeParams(batchIdx, numSample, featureDim, model)
     val weights = model.readWeights()
-
-    val loss = torch.dgiBackward(batchIdx.length, posx, negx,
-      featureDim, first, second, weights)
-
+    param.put("weights", weights)
+    val loss = torch.gcnBackward(param)
     model.step(weights, optim)
     loss
   }

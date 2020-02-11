@@ -1,18 +1,18 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
-#!/usr/bin/env python
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+# !/usr/bin/env python
 
 from __future__ import print_function
 
@@ -25,7 +25,7 @@ from torch import Tensor
 from typing import List
 
 
-class AttentionFM(torch.jit.ScriptModule):
+class AttentionFM(torch.nn.Module):
 
     def __init__(self, input_dim=-1, n_fields=-1, embedding_dim=-1, attention_dim=-1):
         super(AttentionFM, self).__init__()
@@ -35,10 +35,13 @@ class AttentionFM(torch.jit.ScriptModule):
         self.embedding_dim = embedding_dim
         self.mats = []
 
+        # local model do not need real input_dim to init params, so set fake_dim to
+        # speed up to produce local pt file.
+        fake_input_dim = 10
         if input_dim > 0 and embedding_dim > 0 and n_fields > 0:
             self.bias = torch.nn.Parameter(torch.zeros(1, 1))
-            self.weights = torch.nn.Parameter(torch.zeros(input_dim, 1))
-            self.embedding = torch.nn.Parameter(torch.zeros(input_dim, embedding_dim))
+            self.weights = torch.nn.Parameter(torch.zeros(fake_input_dim, 1))
+            self.embedding = torch.nn.Parameter(torch.zeros(fake_input_dim, embedding_dim))
             attention_w = torch.nn.Parameter(torch.zeros(embedding_dim, attention_dim))
             attention_b = torch.nn.Parameter(torch.zeros(attention_dim, 1))
             attention_h = torch.nn.Parameter(torch.zeros(attention_dim, 1))
@@ -51,13 +54,6 @@ class AttentionFM(torch.jit.ScriptModule):
             torch.nn.init.xavier_uniform_(attention_p)
             self.mats = [attention_w, attention_b, attention_h, attention_p]
 
-            self.input_dim = torch.jit.Attribute(self.input_dim, int)
-            self.n_fields = torch.jit.Attribute(self.n_fields, int)
-            self.embedding_dim = torch.jit.Attribute(self.embedding_dim, int)
-            self.mats = torch.jit.Attribute(self.mats, List[Tensor])
-
-
-    @torch.jit.script_method
     def first_order(self, batch_size, index, values, bias, weights):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         size = batch_size
@@ -67,7 +63,6 @@ class AttentionFM(torch.jit.ScriptModule):
         first = output + bias
         return first
 
-    @torch.jit.script_method
     def second_order(self, batch_size, index, values, embeddings, n_fields, embedding_dim, mats):
         # type: (int, Tensor, Tensor, Tensor, int, int, List[Tensor]) -> Tensor
 
@@ -89,7 +84,6 @@ class AttentionFM(torch.jit.ScriptModule):
 
         return attention_out
 
-    @torch.jit.script_method
     def forward_(self, batch_size, index, feats, values, bias, weights, embeddings, mats):
         # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
 
@@ -100,7 +94,6 @@ class AttentionFM(torch.jit.ScriptModule):
 
         return torch.sigmoid(first + second)
 
-    @torch.jit.script_method
     def forward(self, batch_size, index, feats, values):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
@@ -108,15 +101,15 @@ class AttentionFM(torch.jit.ScriptModule):
         return self.forward_(batch_size, index, feats, values,
                              self.bias, batch_first, batch_second, self.mats)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def loss(self, output, targets):
         return self.loss_fn(output, targets)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_type(self):
         return "BIAS_WEIGHT_EMBEDDING_MATS"
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_name(self):
         return "AttentionFM"
 
@@ -126,7 +119,8 @@ FLAGS = None
 
 def main():
     afm = AttentionFM(FLAGS.input_dim, FLAGS.n_fields, FLAGS.embedding_dim, FLAGS.attention_dim)
-    afm.save("attention_fm.pt")
+    afm_script_module = torch.jit.script(afm)
+    afm_script_module.save("attention_fm.pt")
 
 
 if __name__ == "__main__":
@@ -158,4 +152,3 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
     main()
-

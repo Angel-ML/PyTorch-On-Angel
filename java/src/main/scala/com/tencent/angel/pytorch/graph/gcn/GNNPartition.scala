@@ -16,9 +16,10 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
+import java.util.{Map => JMap}
+
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
-import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList, LongOpenHashSet}
 
 class GNNPartition(index: Int,
                    keys: Array[Long],
@@ -31,59 +32,93 @@ class GNNPartition(index: Int,
 
   def numEdges: Long = neighbors.length
 
+  def aloneNodes(model: GNNPSModel, numPartitions: Int): Array[Long] =
+    model.getNodesWithOutDegree(index, numPartitions)
+
+  def makeParams(batchIdx: Array[Int],
+                 numSample: Int,
+                 featureDim: Int,
+                 model: GNNPSModel,
+                 isTraining: Boolean = true): JMap[String, Object] = ???
+
+  def makeParams(nodes: Array[Long],
+                 featureDim: Int,
+                 model: GNNPSModel): JMap[String, Object] = ???
+
   def trainEpoch(curEpoch: Int,
                  batchSize: Int,
                  model: GNNPSModel,
                  featureDim: Int,
                  optim: AsyncOptim,
-                 numSample: Int): (Double, Long) = ???
+                 numSample: Int): (Double, Long, Int) = ???
 
   def predictEpoch(curEpoch: Int,
                    batchSize: Int,
                    model: GNNPSModel,
                    featureDim: Int,
-                   numSample: Int): Long = ???
+                   numSample: Int,
+                   isTest: Boolean = true): Iterator[(Array[Float], Array[Float])] = ???
 
   def genLabels(batchSize: Int,
                 model: GNNPSModel,
                 featureDim: Int,
-                numSample: Int): Iterator[(Long, Long, String)] = ???
+                numSample: Int,
+                numPartitions: Int,
+                parseAloneNodes: Boolean = true): Iterator[(Long, Long, String)] = ???
 
+  //return pred and embedding
+  def genLabelsEmbedding(batchSize: Int,
+                         model: GNNPSModel,
+                         featureDim: Int,
+                         numSample: Int,
+                         numPartitions: Int,
+                         parseAloneNodes: Boolean = true): Iterator[(Long, Long, String, String)] = ???
 
   def genEmbedding(batchSize: Int,
                    model: GNNPSModel,
                    featureDim: Int,
-                   numSample: Int): Iterator[(Long, String)] = {
+                   numSample: Int,
+                   numPartitions: Int,
+                   parseAloneNodes: Boolean = true): Iterator[(Long, String)] = {
 
-
-    val index = new Long2IntOpenHashMap()
-    val srcs = new LongArrayList()
-    val dsts = new LongArrayList()
-    val batchKeys = new LongOpenHashSet()
     val batchIterator = keys.indices.sliding(batchSize, batchSize)
     val weights = model.readWeights()
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
 
-    val it = new Iterator[Array[(Long, String)]] with Serializable {
+    val keyIterator = new Iterator[Array[(Long, String)]] with Serializable {
       override def hasNext: Boolean = {
-        if (!batchIterator.hasNext)
-          TorchModel.addModel(torch)
-        return batchIterator.hasNext
+        if (!batchIterator.hasNext) TorchModel.put(torch)
+        batchIterator.hasNext
       }
 
       override def next: Array[(Long, String)] = {
         val batch = batchIterator.next().toArray
-        val output = genEmbeddingBatch(batch, model, featureDim, numSample,
-          srcs, dsts, batchKeys, index, weights, torch)
-        srcs.clear()
-        dsts.clear()
-        batchKeys.clear()
-        index.clear()
+        val output = genEmbeddingBatch(batch, model, featureDim,
+          numSample, weights, torch)
         output.toArray
       }
     }
-    it.flatMap(f => f.iterator)
+
+    if (parseAloneNodes) { // whether parsing nodes without edges
+      val aloneNodes = model.getNodesWithOutDegree(index, numPartitions)
+      val aloneBatchIterator = aloneNodes.sliding(batchSize, batchSize)
+      val aloneIterator = new Iterator[Array[(Long, String)]] with Serializable {
+        override def hasNext: Boolean = aloneBatchIterator.hasNext
+
+
+        override def next: Array[(Long, String)] = {
+          val batch = aloneBatchIterator.next()
+          val outputs = genEmbeddingBatchAloneNodes(batch, model,
+            featureDim, weights, torch)
+          outputs.toArray
+        }
+      }
+
+      aloneIterator.flatMap(f => f.iterator) ++ keyIterator.flatMap(f => f.iterator)
+    } else {
+      keyIterator.flatMap(f => f.iterator)
+    }
   }
 
 
@@ -91,27 +126,34 @@ class GNNPartition(index: Int,
                         model: GNNPSModel,
                         featureDim: Int,
                         numSample: Int,
-                        srcs: LongArrayList,
-                        dsts: LongArrayList,
-                        batchKeys: LongOpenHashSet,
-                        index: Long2IntOpenHashMap,
                         weights: Array[Float],
                         torch: TorchModel): Iterator[(Long, String)] = {
-    for (idx <- batchIdx) {
-      batchKeys.add(keys(idx))
-      index.put(keys(idx), index.size())
-    }
 
     val batchIds = batchIdx.map(idx => keys(idx))
-    val (first, second) = MakeEdgeIndex.makeEdgeIndex(batchIdx, keys, indptr, neighbors,
-      srcs, dsts, batchKeys, index, numSample, model, true)
-    val x = MakeFeature.makeFeatures(index, featureDim, model)
-    val output = torch.gcnEmbedding(batchIdx.length, x, featureDim,
-      first, second, weights)
+    val params = makeParams(batchIdx, numSample, featureDim, model, false)
+    params.put("weights", weights)
+    val output = torch.gcnEmbedding(params)
     assert(output.length % batchIdx.length == 0)
     val outputDim = output.length / batchIdx.length
     output.sliding(outputDim, outputDim)
       .zip(batchIds.iterator).map {
+      case (h, key) => // h is representation for node ``key``
+        (key, h.mkString(","))
+    }
+  }
+
+  def genEmbeddingBatchAloneNodes(nodes: Array[Long],
+                                  model: GNNPSModel,
+                                  featureDim: Int,
+                                  weights: Array[Float],
+                                  torch: TorchModel): Iterator[(Long, String)] = {
+    val params = makeParams(nodes, featureDim, model)
+    params.put("weights", weights)
+    val output = torch.gcnEmbedding(params)
+    assert(output.length % nodes.length == 0)
+    val outputDim = output.length / nodes.length
+    output.sliding(outputDim, outputDim)
+      .zip(nodes.iterator).map {
       case (h, key) => // h is representation for node ``key``
         (key, h.mkString(","))
     }

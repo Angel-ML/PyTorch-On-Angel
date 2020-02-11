@@ -14,30 +14,13 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.native
+package com.tencent.angel.pytorch.eval
+import org.apache.spark.rdd.RDD
 
-object LibraryLoader {
+class BinaryAccuracy extends Accuracy {
 
-  val libFiles = Array(
-//    "gomp",
-//    "c10",
-//    "caffe2_detectron_ops",
-//    "foxi",
-//    "torch",
-//    "caffe2",
-//    "caffe2_module_test_dynamic",
-//    "foxi_dummy",
-    "torch_angel")
-
-
-  def loadFunc(): Boolean = {
-
-    for (i <- libFiles.indices)
-      System.loadLibrary(libFiles(i))
-
-    return true
+  override def calculate(pairs: RDD[(Double, Double)]): Double = {
+    super.calculate(pairs.map(f => (f._1, if (f._2 >= 0.5) 1 else 0)))
   }
 
-
-  lazy val load = loadFunc()
 }

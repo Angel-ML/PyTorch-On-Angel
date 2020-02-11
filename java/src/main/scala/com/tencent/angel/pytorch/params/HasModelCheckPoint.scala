@@ -14,15 +14,18 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch;
+package com.tencent.angel.pytorch.params
 
-import com.tencent.angel.pytorch.torch.TorchModel;
+import org.apache.spark.ml.param.{IntParam, Params}
 
-public class Test {
-  public static void main(String[] argv) throws InterruptedException {
-    System.loadLibrary("torch_angel");
-    TorchModel.setPath("gcn.pt");
-    System.out.println(TorchModel.get().getParametersTotalSize());
-  }
+trait HasModelCheckPoint extends Params {
+
+  final val periods = new IntParam(this, "periods", "periods")
+
+  setDefault(periods, Int.MaxValue)
+
+  final def getPeriods: Int = $(periods)
+
+  final def setPeriods(value: Int): this.type = set(periods, value)
 
 }

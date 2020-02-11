@@ -16,7 +16,7 @@
  */
 package com.tencent.angel.pytorch.graph.subgraph
 
-import com.tencent.angel.pytorch.graph.utils.DataLoaderUtils
+import com.tencent.angel.pytorch.io.DataLoaderUtils
 import com.tencent.angel.pytorch.params.{HasInputFeaturePath, HasLabelPath, HasOutputFeaturePath}
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.graph.params._

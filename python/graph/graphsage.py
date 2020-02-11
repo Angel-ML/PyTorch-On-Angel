@@ -1,18 +1,18 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
-#!/usr/bin/env python
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+# !/usr/bin/env python
 
 from __future__ import print_function
 
@@ -24,14 +24,15 @@ from torch.nn import Parameter
 
 from utils import scatter_mean
 
+
 class SAGETwoSoftmax(torch.jit.ScriptModule):
 
     def __init__(self, in_dim, hidden, out_dim):
         super(SAGETwoSoftmax, self).__init__()
-        self.weight1 = Parameter(torch.zeros(in_dim*2, hidden))
+        self.weight1 = Parameter(torch.zeros(in_dim * 2, hidden))
         self.bias1 = Parameter(torch.zeros(hidden))
 
-        self.weight2 = Parameter(torch.zeros(hidden*2, hidden))
+        self.weight2 = Parameter(torch.zeros(hidden * 2, hidden))
         self.bias2 = Parameter(torch.zeros(hidden))
 
         self.weight3 = Parameter(torch.zeros(hidden, out_dim))
@@ -68,10 +69,16 @@ class SAGETwoSoftmax(torch.jit.ScriptModule):
         return output.max(1)[1]
 
     @torch.jit.script_method
+    def embedding_predict_(self, embedding):
+        out = torch.matmul(embedding, self.weight3)
+        out = out + self.bias3
+        return F.log_softmax(out, dim=1)
+
+    @torch.jit.script_method
     def embedding_(self, x, first_edge_index, second_edge_index):
         # first layer
         row, col = second_edge_index[0], second_edge_index[1]
-        out = scatter_mean(x[col], row, dim=0) # do not set dim_size
+        out = scatter_mean(x[col], row, dim=0)  # do not set dim_size
         out = torch.cat([x[0:out.size(0)], out], dim=1)
         out = torch.matmul(out, self.weight1)
         out = out + self.bias1
@@ -80,7 +87,7 @@ class SAGETwoSoftmax(torch.jit.ScriptModule):
 
         # second layer
         row, col = first_edge_index[0], first_edge_index[1]
-        neighbors = scatter_mean(out[col], row, dim=0) # do not set dim_size
+        neighbors = scatter_mean(out[col], row, dim=0)  # do not set dim_size
         out = torch.cat([out[0:neighbors.size(0)], neighbors], dim=1)
         out = torch.matmul(out, self.weight2)
         out = out + self.bias2
@@ -91,11 +98,14 @@ class SAGETwoSoftmax(torch.jit.ScriptModule):
         y_true = y_true.view(-1).to(torch.long)
         return y_pred.max(1)[1].eq(y_true).sum().item() / y_pred.size(0)
 
+
 FLAGS = None
+
 
 def main():
     sage = SAGETwoSoftmax(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.output_dim)
     sage.save(FLAGS.output_file)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

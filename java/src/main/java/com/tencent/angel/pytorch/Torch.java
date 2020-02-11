@@ -22,7 +22,9 @@ public class Torch {
 
   public static native String name(long ptr);
 
-  public static native void setNumThreads(int nThreads);
+  public static native void train(long ptr);
+
+  public static native void eval(long ptr);
 
   public static native long initPtr(String path);
 
@@ -34,14 +36,15 @@ public class Torch {
 
   public static native int getInputDim(long ptr);
 
+  public static native long[] getInputSizes(long ptr);
+
   public static native int getNumFields(long ptr);
 
   public static native int getEmbeddingDim(long ptr);
 
-  public static native int getParametersTotalSize(long ptr);
+  public static native int[] getEmbeddingsSize(long ptr);
 
-  /* set parameters to torch */
-  public static native void setParameters(long ptr, float[] values);
+  public static native int getParametersTotalSize(long ptr);
 
   /* forward */
   public static native float[] forward(long ptr, Map<String, Object> params, boolean serving);
@@ -52,6 +55,9 @@ public class Torch {
   /* save module */
   public static native void save(long ptr, Map<String, Object> params);
 
+  /* word2vec backward */
+  public static native float word2vecBackward(long ptr, Map<String, Object> params);
+
   /* graph backward */
   public static native float gcnBackward(long ptr, Map<String, Object> params);
 
@@ -60,5 +66,10 @@ public class Torch {
 
   /* graph get all parameters */
   public static native float[] getParameters(long ptr);
+
+  /* set parameters to torch */
+  public static native void setParameters(long ptr, float[] values);
+
+  public static native void gcnSave(long ptr, Map<String, Object> params);
 
 }

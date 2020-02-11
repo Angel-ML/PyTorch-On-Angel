@@ -23,7 +23,7 @@ trait HasOptimizer extends Params {
 
   final val optimizer = new Param[String](this, "optimizer", "optimizer")
 
-  final def getOptimizer: AsyncOptim = OptimUtils.apply($(optimizer), $(stepSize))
+  final def getOptimizer: AsyncOptim = OptimUtils.apply($(optimizer), $(stepSize), $(decay))
 
   setDefault(optimizer, "SGD")
 
@@ -36,4 +36,12 @@ trait HasOptimizer extends Params {
   setDefault(stepSize, 0.01)
 
   final def setStepSize(value: Double): this.type = set(stepSize, value)
+
+  final val decay = new Param[Double](this, "decay", "decay")
+
+  final def getDecay: Double = $(decay)
+
+  setDefault(decay, 0.0)
+
+  final def setDecay(value: Double): this.type = set(decay, value)
 }

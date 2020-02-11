@@ -22,27 +22,29 @@ import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
 import com.tencent.angel.spark.ml.psf.optim.{AsyncAdagradFunc, AsyncOptimParam}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
-class AsyncAdagrad(eta: Double, factor: Double = 0.9) extends AsyncOptim {
+class AsyncAdagrad(eta: Double, decay: Double, factor: Double = 0.9)
+  extends AsyncOptim(eta, decay) {
   override def getNumSlots(): Int = 2
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam =
-    new AsyncOptimParam(matrixId, grads, Array(eta, factor), Array(offset, getNumSlots()))
+    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, factor), Array(offset, getNumSlots()))
 
-  override def asycUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
+  override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
     grad.setRowId(vector.id)
     val func = new AsyncAdagradFunc(getParam(vector.poolId, Array(grad), offset))
     vector.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
     assert(grads.length == rowIds.length)
-    //    println(rowIds.mkString(","))
-    grads.zip(rowIds).map(f => f._1.setRowId(f._2))
+    grads.zip(rowIds).foreach(f => f._1.setRowId(f._2))
     val func = new AsyncAdagradFunc(getParam(matrix.id, grads, offset))
     matrix.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
-    asycUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
+    asyncUpdate(matrix, offset, (0 until grads.length).toArray, grads)
   }
+
+  override def toString: String = s"AsyncAdagrad ${super.toString}"
 }

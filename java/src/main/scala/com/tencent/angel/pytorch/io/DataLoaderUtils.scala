@@ -14,7 +14,7 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.graph.utils
+package com.tencent.angel.pytorch.io
 
 object DataLoaderUtils {
 

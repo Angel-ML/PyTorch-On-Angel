@@ -16,12 +16,11 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
+import java.util.{HashMap => JHashMap, Map => JMap}
+
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
-import it.unimi.dsi.fastutil.ints.{IntArrayList, IntOpenHashSet}
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList, LongOpenHashSet}
-
-import scala.collection.mutable.ArrayBuffer
 
 class GCNPartition(index: Int,
                    keys: Array[Long],
@@ -37,37 +36,92 @@ class GCNPartition(index: Int,
   def getTrainTestSize(): (Int, Int) = (trainIdx.length, testIdx.length)
 
   override
+  def makeParams(batchIdx: Array[Int],
+                 numSample: Int,
+                 featureDim: Int,
+                 model: GNNPSModel,
+                 isTraining: Boolean = true): JMap[String, Object] = {
+    val batchKeys = new LongOpenHashSet()
+    val index = new Long2IntOpenHashMap()
+    val srcs = new LongArrayList()
+    val dsts = new LongArrayList()
+
+    for (idx <- batchIdx) {
+      batchKeys.add(keys(idx))
+      index.put(keys(idx), index.size())
+    }
+
+    val (first, second) = MakeEdgeIndex.makeEdgeIndex(batchIdx,
+      keys, indptr, neighbors, srcs, dsts,
+      batchKeys, index, numSample, model, true)
+
+    val x = MakeFeature.makeFeatures(index, featureDim, model)
+    val params = new JHashMap[String, Object]()
+    params.put("first_edge_index", first)
+    params.put("second_edge_index", second)
+    params.put("x", x)
+    params.put("batch_size", new Integer(batchIdx.length))
+    params.put("feature_dim", new Integer(featureDim))
+    params
+  }
+
+  override
+  def makeParams(nodes: Array[Long],
+                 featureDim: Int,
+                 model: GNNPSModel): JMap[String, Object] = {
+    val index = new Long2IntOpenHashMap()
+    for (node <- nodes)
+      index.put(node, index.size())
+    val first = MakeEdgeIndex.makeEdgeIndex(nodes, index)
+    val x = MakeFeature.makeFeatures(index, featureDim, model)
+    val params = new JHashMap[String, Object]()
+    params.put("first_edge_index", first)
+    params.put("second_edge_index", first)
+    params.put("x", x)
+    params.put("batch_size", new Integer(nodes.length))
+    params.put("feature_dim", new Integer(featureDim))
+    params
+  }
+
+  def makeParams(embedding: Array[Float],
+                 batchSize: Int,
+                 weights: Array[Float]): JMap[String, Object] = {
+    val hiddenDim = embedding.length / batchSize
+    val params = new JHashMap[String, Object]()
+    params.put("embedding", embedding)
+    params.put("weights", weights)
+    params.put("hidden_dim", new Integer(hiddenDim))
+    params.put("feature_dim", new Integer(0))
+    params
+  }
+
+  override
   def trainEpoch(curEpoch: Int,
                  batchSize: Int,
                  model: GNNPSModel,
                  featureDim: Int,
                  optim: AsyncOptim,
-                 numSample: Int): (Double, Long) = {
-    val index = new Long2IntOpenHashMap()
-    val srcs = new LongArrayList()
-    val dsts = new LongArrayList()
-    val batchKeys = new LongOpenHashSet()
+                 numSample: Int): (Double, Long, Int) = {
+
     val batchIterator = trainIdx.zip(trainLabels).sliding(batchSize, batchSize)
     var lossSum = 0.0
     var numRight: Long = 0
 
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
+    var numStep = 0
 
     while (batchIterator.hasNext) {
       val batch = batchIterator.next()
       val (loss, right) = trainBatch(batch, model, featureDim,
-        optim, numSample, srcs, dsts, batchKeys, index, torch)
+        optim, numSample, torch)
       lossSum += loss * batch.length
       numRight += right
-      srcs.clear()
-      dsts.clear()
-      batchKeys.clear()
-      index.clear()
+      numStep += 1
     }
 
-    TorchModel.addModel(torch) // return torch for next epoch
-    (lossSum, numRight)
+    TorchModel.put(torch) // return torch for next epoch
+    (lossSum, numRight, numStep)
   }
 
   def trainBatch(batchIdx: Array[(Int, Float)],
@@ -75,37 +129,22 @@ class GCNPartition(index: Int,
                  featureDim: Int,
                  optim: AsyncOptim,
                  numSample: Int,
-                 srcs: LongArrayList,
-                 dsts: LongArrayList,
-                 batchKeys: LongOpenHashSet,
-                 index: Long2IntOpenHashMap,
                  torch: TorchModel): (Double, Long) = {
-    val targets = new Array[Long](batchIdx.length)
+
+    val targets = new Array[Float](batchIdx.length)
     var k = 0
-    for ((idx, label) <- batchIdx) {
-      batchKeys.add(keys(idx))
-      index.put(keys(idx), index.size())
-      targets(k) = label.toLong
+    for ((_, label) <- batchIdx) {
+      targets(k) = label
       k += 1
     }
 
-    val (first, second) = MakeEdgeIndex.makeEdgeIndex(batchIdx.map(f => f._1),
-      keys, indptr, neighbors, srcs, dsts,
-      batchKeys, index, numSample, model, true)
-    val x = MakeFeature.makeFeatures(index, featureDim, model)
-
     val weights = model.readWeights()
-    val outputs = torch.gcnPredict(batchIdx.length, x, featureDim,
-      first, second, weights)
-    val loss = torch.gcnBackward(batchIdx.length, x, featureDim,
-      first, second, weights, targets)
+    val params = makeParams(batchIdx.map(f => f._1), numSample, featureDim, model)
+    params.put("targets", targets)
+    params.put("weights", weights)
+    val loss = torch.gcnBackward(params)
     model.step(weights, optim)
-
-    var right: Long = 0
-    for (i <- outputs.indices)
-      if (outputs(i) == targets(i))
-        right += 1
-    (loss, right)
+    (loss, 0)
   }
 
   override
@@ -113,149 +152,236 @@ class GCNPartition(index: Int,
                    batchSize: Int,
                    model: GNNPSModel,
                    featureDim: Int,
-                   numSample: Int): Long = {
-    val index = new Long2IntOpenHashMap()
-    val srcs = new LongArrayList()
-    val dsts = new LongArrayList()
-    val batchKeys = new LongOpenHashSet()
-    val batchIterator = testIdx.zip(testLabels).sliding(batchSize, batchSize)
-    var numRight: Int = 0
+                   numSample: Int,
+                   isTest: Boolean = true): Iterator[(Array[Float], Array[Float])] = {
+
+    val zips = if (isTest) testIdx.zip(testLabels) else trainIdx.zip(trainLabels)
+    val batchIterator = zips.sliding(batchSize, batchSize)
     val weights = model.readWeights()
 
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
 
-    while (batchIterator.hasNext) {
-      val batch = batchIterator.next()
-      val right = predictBatch(batch, model, featureDim, numSample,
-        srcs, dsts, batchKeys, index, weights, torch)
-      numRight += right
-      srcs.clear()
-      dsts.clear()
-      batchKeys.clear()
-      index.clear()
-    }
+    new Iterator[(Array[Float], Array[Float])] with Serializable {
+      override def hasNext: Boolean = {
+        if (!batchIterator.hasNext)
+          TorchModel.put(torch)
+        batchIterator.hasNext
+      }
 
-    TorchModel.addModel(torch) // return torch for next epoch
-    numRight
+      override def next: (Array[Float], Array[Float]) = {
+        val batch = batchIterator.next()
+        predictBatch(batch, model, featureDim, numSample, weights, torch)
+      }
+    }
   }
 
   def predictBatch(batchIdx: Array[(Int, Float)],
                    model: GNNPSModel,
                    featureDim: Int,
                    numSample: Int,
-                   srcs: LongArrayList,
-                   dsts: LongArrayList,
-                   batchKeys: LongOpenHashSet,
-                   index: Long2IntOpenHashMap,
                    weights: Array[Float],
-                   torch: TorchModel): Int = {
-    val targets = new Array[Long](batchIdx.length)
-    var k = 0
-    for ((idx, label) <- batchIdx) {
-      batchKeys.add(keys(idx))
-      index.put(keys(idx), index.size())
-      targets(k) = label.toLong
-      k += 1
+                   torch: TorchModel): (Array[Float], Array[Float]) = {
+    val targets = batchIdx.map(f => f._2)
+    val params = makeParams(batchIdx.map(f => f._1), numSample, featureDim, model, false)
+    params.put("weights", weights)
+    val outputs = torch.gcnPredict(params)
+    outputs match {
+      case f: Array[Float] => (targets, f)
+      case l: Array[Long] => (targets, l.map(x => x.toFloat))
     }
-
-    val (first, second) = MakeEdgeIndex.makeEdgeIndex(batchIdx.map(f => f._1),
-      keys, indptr, neighbors, srcs, dsts,
-      batchKeys, index, numSample, model, true)
-    val x = MakeFeature.makeFeatures(index, featureDim, model)
-    val outputs = torch.gcnPredict(batchIdx.length, x, featureDim,
-      first, second, weights)
-    assert(outputs.length == targets.length)
-    var right = 0
-    for (i <- outputs.indices)
-      if (outputs(i) == targets(i))
-        right += 1
-    right
   }
 
   override
   def genLabels(batchSize: Int,
                 model: GNNPSModel,
                 featureDim: Int,
-                numSample: Int): Iterator[(Long, Long, String)] = {
-//    val labeledIdx = new IntOpenHashSet()
-//    trainIdx.foreach(idx => labeledIdx.add(idx))
-//    testIdx.foreach(idx => labeledIdx.add(idx))
-//
-//    val unlabeledIdx = new IntArrayList()
-//    for (idx <- keys.indices)
-//      if (!labeledIdx.contains(idx))
-//        unlabeledIdx.add(idx)
-//
-//    val predictIdx = unlabeledIdx.toIntArray
+                numSample: Int,
+                numPartitions: Int,
+                parseAloneNodes: Boolean = true): Iterator[(Long, Long, String)] = {
 
-    val index = new Long2IntOpenHashMap()
-    val srcs = new LongArrayList()
-    val dsts = new LongArrayList()
-    val batchKeys = new LongOpenHashSet()
     val weights = model.readWeights()
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
     val batchIterator = keys.indices.sliding(batchSize, batchSize)
-
-    val it = new Iterator[Array[(Long, Long, String)]] with Serializable {
+    val keysIterator = new Iterator[Array[(Long, Long, String)]] with Serializable {
       override def hasNext: Boolean = {
-        if (!batchIterator.hasNext) TorchModel.addModel(torch)
+        if (!batchIterator.hasNext) TorchModel.put(torch)
         batchIterator.hasNext
       }
 
       override def next: Array[(Long, Long, String)] = {
         val batch = batchIterator.next().toArray
         val outputs = genLabelsBatch(batch, model, featureDim, numSample,
-          srcs, dsts, batchKeys, index, weights, torch)
-        srcs.clear()
-        dsts.clear()
-        batchKeys.clear()
-        index.clear()
+          weights, torch)
         outputs.toArray
       }
     }
 
-    it.flatMap(f => f.iterator)
+    if (parseAloneNodes) { // whether generating labels for nodes without edges
+      val aloneNodes = model.getNodesWithOutDegree(index, numPartitions)
+      val aloneBatchIterator = aloneNodes.sliding(batchSize, batchSize)
+      val aloneIterator = new Iterator[Array[(Long, Long, String)]] with Serializable {
+        override def hasNext: Boolean = aloneBatchIterator.hasNext
+
+        override def next: Array[(Long, Long, String)] = {
+          val batch = aloneBatchIterator.next()
+          val outputs = genLabelsBatchAloneNodes(batch, model,
+            featureDim, weights, torch)
+          outputs.toArray
+        }
+      }
+
+      aloneIterator.flatMap(f => f.iterator) ++ keysIterator.flatMap(f => f.iterator)
+    } else {
+      keysIterator.flatMap(f => f.iterator)
+    }
   }
 
   def genLabelsBatch(batchIdx: Array[Int],
                      model: GNNPSModel,
                      featureDim: Int,
                      numSample: Int,
-                     srcs: LongArrayList,
-                     dsts: LongArrayList,
-                     batchKeys: LongOpenHashSet,
-                     index: Long2IntOpenHashMap,
                      weights: Array[Float],
                      torch: TorchModel): Iterator[(Long, Long, String)] = {
-    for (idx <- batchIdx) {
-      batchKeys.add(keys(idx))
-      index.put(keys(idx), index.size())
-    }
 
-    var (start, end) = (0L, 0L)
 
-    start = System.currentTimeMillis()
     val batchIds = batchIdx.map(idx => keys(idx))
-    val (first, second) = MakeEdgeIndex.makeEdgeIndex(batchIdx,
-      keys, indptr, neighbors,
-      srcs, dsts, batchKeys, index, numSample, model, true)
-    val x = MakeFeature.makeFeatures(index, featureDim, model)
-    end = System.currentTimeMillis()
-    val networkTime = end - start
-    val outputs = torch.gcnForward(batchIds.length, x, featureDim,
-      first, second, weights)
-    end = System.currentTimeMillis()
-    val forwardTime = System.currentTimeMillis() - end
-    println(s"networkTime=$networkTime forwardTime=$forwardTime")
+    val params = makeParams(batchIdx, numSample, featureDim, model, false)
+    params.put("weights", weights)
+    val outputs = torch.gcnForward(params)
     assert(outputs.length % batchIds.length == 0)
     val numLabels = outputs.length / batchIds.length
     outputs.sliding(numLabels, numLabels)
       .zip(batchIds.iterator).map {
       case (p, key) =>
-        val maxIndex = p.zipWithIndex.maxBy(_._1)._2
+        val maxIndex =
+          if (p.length == 1)
+            if (p(0) >= 0.5) 1L
+            else 0L
+          else p.zipWithIndex.maxBy(_._1)._2
         (key, maxIndex, p.mkString(","))
+    }
+  }
+
+  def genLabelsBatchAloneNodes(nodes: Array[Long],
+                               model: GNNPSModel,
+                               featureDim: Int,
+                               weights: Array[Float],
+                               torch: TorchModel): Iterator[(Long, Long, String)] = {
+    val params = makeParams(nodes, featureDim, model)
+    params.put("weights", weights)
+    val outputs = torch.gcnForward(params)
+    assert(outputs.length % nodes.length == 0)
+    val numLabels = outputs.length / nodes.length
+    outputs.sliding(numLabels, numLabels)
+      .zip(nodes.iterator).map {
+      case (p, key) =>
+        val maxIndex =
+          if (p.length == 1)
+            if (p(0) >= 0.5) 1L
+            else 0L
+          else p.zipWithIndex.maxBy(_._1)._2
+        (key, maxIndex, p.mkString(","))
+    }
+  }
+
+
+  override def genLabelsEmbedding(batchSize: Int,
+                                  model: GNNPSModel,
+                                  featureDim: Int,
+                                  numSample: Int,
+                                  numPartitions: Int,
+                                  parseAloneNodes: Boolean = true): Iterator[(Long, Long, String, String)] = {
+    val weights = model.readWeights()
+    TorchModel.setPath(torchModelPath)
+    val torch = TorchModel.get()
+    val batchIterator = keys.indices.sliding(batchSize, batchSize)
+    val keysIterator = new Iterator[Array[(Long, Long, String, String)]] with Serializable {
+      override def hasNext: Boolean = {
+        if (!batchIterator.hasNext) TorchModel.put(torch)
+        batchIterator.hasNext
+      }
+
+      override def next: Array[(Long, Long, String, String)] = {
+        val batch = batchIterator.next().toArray
+        val outputs = genLabelsEmbeddingBatch(batch, model, featureDim, numSample,
+          weights, torch)
+        outputs.toArray
+      }
+    }
+
+    if (parseAloneNodes) { // whether generating labels for nodes without edges
+      val aloneNodes = model.getNodesWithOutDegree(index, numPartitions)
+      val aloneBatchIterator = aloneNodes.sliding(batchSize, batchSize)
+      val aloneIterator = new Iterator[Array[(Long, Long, String, String)]] with Serializable {
+        override def hasNext: Boolean = aloneBatchIterator.hasNext
+
+        override def next: Array[(Long, Long, String, String)] = {
+          val batch = aloneBatchIterator.next()
+          val outputs = genLabelsEmbeddingBatchAloneNodes(batch, model,
+            featureDim, weights, torch)
+          outputs.toArray
+        }
+      }
+
+      aloneIterator.flatMap(f => f.iterator) ++ keysIterator.flatMap(f => f.iterator)
+    } else {
+      keysIterator.flatMap(f => f.iterator)
+    }
+  }
+
+  def genLabelsEmbeddingBatch(batchIdx: Array[Int],
+                              model: GNNPSModel,
+                              featureDim: Int,
+                              numSample: Int,
+                              weights: Array[Float],
+                              torch: TorchModel): Iterator[(Long, Long, String, String)] = {
+    val batchIds = batchIdx.map(idx => keys(idx))
+    var params = makeParams(batchIdx, numSample, featureDim, model, false)
+    params.put("weights", weights)
+    val embedding = torch.gcnEmbedding(params)
+    assert(embedding.length % batchIds.length == 0)
+    params = makeParams(embedding, batchIds.length, weights)
+    val outputs = torch.gcnPred(params)
+    assert(outputs.length % batchIds.length == 0)
+    val numLabels = outputs.length / batchIds.length
+    val outputDim = embedding.length / batchIdx.length
+    outputs.sliding(numLabels, numLabels).zip(embedding.sliding(outputDim, outputDim))
+      .zip(batchIds.iterator).map {
+      case ((p, h), key) =>
+        val maxIndex =
+          if (p.length == 1)
+            if (p(0) >= 0.5) 1L
+            else 0L
+          else p.zipWithIndex.maxBy(_._1)._2
+        (key, maxIndex, h.mkString(","), p.mkString(","))
+    }
+  }
+
+  def genLabelsEmbeddingBatchAloneNodes(nodes: Array[Long],
+                                        model: GNNPSModel,
+                                        featureDim: Int,
+                                        weights: Array[Float],
+                                        torch: TorchModel): Iterator[(Long, Long, String, String)] = {
+    var params = makeParams(nodes, featureDim, model)
+    params.put("weights", weights)
+    val embedding = torch.gcnEmbedding(params)
+    assert(embedding.length % nodes.length == 0)
+    params = makeParams(embedding, nodes.length, weights)
+    val outputs = torch.gcnPred(params)
+    assert(outputs.length % nodes.length == 0)
+    val numLabels = outputs.length / nodes.length
+    val outputDim = embedding.length / nodes.length
+    outputs.sliding(numLabels, numLabels).zip(embedding.sliding(outputDim, outputDim))
+      .zip(nodes.iterator).map {
+      case ((p, h), key) =>
+        val maxIndex =
+          if (p.length == 1)
+            if (p(0) >= 0.5) 1L
+            else 0L
+          else p.zipWithIndex.maxBy(_._1)._2
+        (key, maxIndex, h.mkString(","), p.mkString(","))
     }
   }
 

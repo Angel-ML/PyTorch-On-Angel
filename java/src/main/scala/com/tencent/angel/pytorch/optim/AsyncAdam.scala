@@ -23,30 +23,32 @@ import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
 import com.tencent.angel.spark.ml.psf.optim.{AsyncAdamFunc, AsyncOptimParam}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
-class AsyncAdam(eta: Double, gamma: Double = 0.99, beta: Double = 0.9) extends AsyncOptim {
-
-  var numUpdates = 0
+class AsyncAdam(eta: Double, decay: Double = 0.0, gamma: Double = 0.99, beta: Double = 0.9)
+  extends AsyncOptim(eta, decay) {
 
   override def getNumSlots(): Int = 3
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam = {
-    numUpdates += 1
-    new AsyncOptimParam(matrixId, grads, Array(eta, gamma, beta), Array(offset, getNumSlots(), numUpdates))
+    numSteps += 1
+    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, gamma, beta), Array(offset, getNumSlots(), numSteps))
   }
 
-  override def asycUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
+  override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
     grad.setRowId(vector.id)
     val func = new AsyncAdamFunc(getParam(vector.poolId, Array(grad), offset))
     vector.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
     assert(grads.length == rowIds.length)
     grads.zip(rowIds).foreach(f => f._1.setRowId(f._2))
     val func = new AsyncAdamFunc(getParam(matrix.id, grads, offset))
     matrix.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] =
-    asycUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] =
+    asyncUpdate(matrix, offset, grads.indices.toArray, grads)
+
+  override def toString: String =
+    s"AsyncAdam ${super.toString}"
 }
