@@ -17,7 +17,7 @@
 package com.tencent.angel.pytorch.examples.supervised
 
 import com.tencent.angel.pytorch.graph.gcn.GCN
-import com.tencent.angel.pytorch.graph.utils.GCNIO
+import com.tencent.angel.pytorch.io.IOFunctions
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
 import com.tencent.angel.spark.ml.graph.utils.GraphIO
@@ -32,8 +32,10 @@ object GCNExample {
     val edgeInput = params.getOrElse("edgePath", "")
     val featureInput = params.getOrElse("featurePath", "")
     val labelPath = params.getOrElse("labelPath", "")
+    val testLabelPath = params.getOrElse("testLabelPath", "")
     val predictOutputPath = params.getOrElse("predictOutputPath", "")
     val embeddingPath = params.getOrElse("embeddingPath", "")
+    val outputModelPath = params.getOrElse("outputModelPath", "")
     val batchSize = params.getOrElse("batchSize", "100").toInt
     val torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
@@ -48,6 +50,11 @@ object GCNExample {
     val numSamples = params.getOrElse("samples", "5").toInt
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
     val numBatchInit = params.getOrElse("numBatchInit", "5").toInt
+    val actionType = params.getOrElse("actionType", "train")
+    val periods = params.getOrElse("periods", "1000").toInt
+    val checkpointInterval = params.getOrElse("checkpointInterval", "0").toInt
+    val decay = params.getOrElse("decay", "0.000").toFloat
+    val evals = params.getOrElse("evals", "acc")
 
 
     val gcn = new GCN()
@@ -66,24 +73,29 @@ object GCNExample {
     gcn.setDataFormat(format)
     gcn.setNumSamples(numSamples)
     gcn.setNumBatchInit(numBatchInit)
+    gcn.setPeriods(periods)
+    gcn.setCheckpointInterval(checkpointInterval)
+    gcn.setDecay(decay)
+    gcn.setEvaluations(evals)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false)
-    val features = GCNIO.loadFeature(featureInput, sep = "\t")
-    val labels = GCNIO.loadLabel(labelPath)
+    val features = IOFunctions.loadFeature(featureInput, sep = "\t")
+    val labels = IOFunctions.loadLabel(labelPath)
+    val testLabels = if (testLabelPath.length > 0) Option(IOFunctions.loadLabel(testLabelPath)) else None
 
-    val (model, graph) = gcn.initialize(edges, features, Option(labels))
+    val (model, graph) = gcn.initialize(edges, features, Option(labels), testLabels)
     gcn.showSummary(model, graph)
-    gcn.fit(model, graph)
+
+    if (actionType == "train")
+      gcn.fit(model, graph, outputModelPath)
 
     if (predictOutputPath.length > 0) {
-      val predict = gcn.genLabels(model, graph)
-      GraphIO.save(predict, predictOutputPath, seq = " ")
+      val embedPred = gcn.genLabelsEmbedding(model, graph)
+      GraphIO.save(embedPred, predictOutputPath, seq = " ")
     }
 
-    if (embeddingPath.length > 0) {
-      val embedding = gcn.genEmbedding(model, graph)
-      GraphIO.save(embedding, embeddingPath, seq = " ")
-    }
+    if (actionType == "train" && outputModelPath.length > 0)
+      gcn.save(model, outputModelPath)
 
     stop()
   }

@@ -39,12 +39,12 @@ class FeaturePartition(index: Int,
 
 private[subgraph]
 object FeaturePartition {
-//  def apply(index: Int, iterator: Iterator[(Long, String)]): FeaturePartition = {
-//    val fs = iterator.toArray
-//    val keys = fs.map(f => f._1)
-//    val features = fs.map(f => f._2)
-//    new FeaturePartition(index, keys, features)
-//  }
+  //  def apply(index: Int, iterator: Iterator[(Long, String)]): FeaturePartition = {
+  //    val fs = iterator.toArray
+  //    val keys = fs.map(f => f._1)
+  //    val features = fs.map(f => f._2)
+  //    new FeaturePartition(index, keys, features)
+  //  }
 
   def apply(index: Int, iterator: Iterator[String]): FeaturePartition = {
     val keys = new LongArrayList()

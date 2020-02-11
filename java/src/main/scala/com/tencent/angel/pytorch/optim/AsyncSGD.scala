@@ -23,25 +23,28 @@ import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.ml.psf.optim.{AsyncOptimParam, AsyncSGDFunc}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
-class AsyncSGD(stepSize: Double) extends AsyncOptim {
+class AsyncSGD(eta: Double, decay: Double) extends AsyncOptim(eta, decay) {
   override
   def getNumSlots(): Int = 1
 
-  override def asycUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
+  override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
     grad.setRowId(vector.id)
-    val param = new AsyncOptimParam(vector.poolId, Array(grad), Array(stepSize), Array(offset, getNumSlots()))
+    val param = new AsyncOptimParam(vector.poolId, Array(grad), Array(getCurrentEta), Array(offset, getNumSlots()))
     val func = new AsyncSGDFunc(param)
     vector.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
     grads.zip(rowIds).map(f => f._1.setRowId(f._2))
-    val param = new AsyncOptimParam(matrix.id, grads, Array(stepSize), Array(offset, getNumSlots()))
+    val param = new AsyncOptimParam(matrix.id, grads, Array(eta), Array(offset, getNumSlots()))
     val func = new AsyncSGDFunc(param)
     matrix.psfUpdate(func)
   }
 
-  override def asycUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
-    asycUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+  override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
+    asyncUpdate(matrix, offset, (0 until grads.length).toArray, grads)
   }
+
+  override def toString: String =
+    s"AsyncSGD ${super.toString}"
 }

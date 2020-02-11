@@ -29,15 +29,23 @@ extern "C" {
  * Signature: (J)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_name
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
- * Method:    setNumThreads
- * Signature: (I)V
+ * Method:    train
+ * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setNumThreads
-  (JNIEnv *, jclass, jint);
+JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_train
+(JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    eval
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_eval
+(JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -45,7 +53,7 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setNumThreads
  * Signature: (Ljava/lang/String;)J
  */
 JNIEXPORT jlong JNICALL Java_com_tencent_angel_pytorch_Torch_initPtr
-  (JNIEnv *, jclass, jstring);
+        (JNIEnv *, jclass, jstring);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -53,7 +61,7 @@ JNIEXPORT jlong JNICALL Java_com_tencent_angel_pytorch_Torch_initPtr
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_destroyPtr
-  (JNIEnv *, jclass, jlong);
+(JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -61,7 +69,7 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_destroyPtr
  * Signature: (J)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getType
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -69,7 +77,7 @@ JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getType
  * Signature: (J)[I
  */
 JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsSize
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -77,7 +85,15 @@ JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsSize
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getInputDim
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getInputSizes
+ * Signature: (J)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_getInputSizes
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -85,7 +101,7 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getInputDim
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -93,7 +109,15 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingDim
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getEmbeddingsSize
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingsSize
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -101,15 +125,7 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingDim
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getParametersTotalSize
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     com_tencent_angel_pytorch_Torch
- * Method:    setParameters
- * Signature: (J[F)V
- */
-JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setParameters
-  (JNIEnv *, jclass, jlong, jfloatArray);
+        (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -117,7 +133,7 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setParameters
  * Signature: (JLjava/util/Map;Z)[F
  */
 JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
-  (JNIEnv *, jclass, jlong, jobject, jboolean);
+        (JNIEnv *, jclass, jlong, jobject, jboolean);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -125,7 +141,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
  * Signature: (JLjava/util/Map;)F
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_backward
-  (JNIEnv *, jclass, jlong, jobject);
+        (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -133,14 +149,23 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_backward
  * Signature: (JLjava/util/Map;)V
  */
 JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
-  (JNIEnv *, jclass, jlong, jobject);
+(JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    word2vecBackward
+ * Signature: (JLjava/util/Map;)F
+ */
+JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_word2vecBackward
+        (JNIEnv *, jclass, jlong, jobject);
+
 /*
  * Class:     com_tencent_angel_pytorch_Torch
  * Method:    gcnBackward
  * Signature: (JLjava/util/Map;)F
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
-  (JNIEnv *, jclass, jlong, jobject);
+        (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -148,7 +173,7 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
  * Signature: (JLjava/lang/String;Ljava/util/Map;)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
-  (JNIEnv *, jclass, jlong, jstring, jobject);
+        (JNIEnv *, jclass, jlong, jstring, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -156,7 +181,31 @@ JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
  * Signature: (J)[F
  */
 JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getParameters
-  (JNIEnv *, jclass, jlong);
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getMatsParameters
+ * Signature: (J)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsParameters
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    setParameters
+ * Signature: (J[F)V
+ */
+JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setParameters
+(JNIEnv *, jclass, jlong, jfloatArray);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    gcnSave
+ * Signature: (JLjava/util/Map;)V
+ */
+JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_gcnSave
+(JNIEnv *, jclass, jlong, jobject);
 
 #ifdef __cplusplus
 }

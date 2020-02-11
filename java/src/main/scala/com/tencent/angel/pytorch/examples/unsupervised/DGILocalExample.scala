@@ -18,7 +18,7 @@ package com.tencent.angel.pytorch.examples.unsupervised
 
 import com.tencent.angel.conf.AngelConf
 import com.tencent.angel.pytorch.graph.gcn.DGI
-import com.tencent.angel.pytorch.graph.utils.GCNIO
+import com.tencent.angel.pytorch.io.IOFunctions
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
 import com.tencent.angel.spark.ml.graph.utils.GraphIO
@@ -51,7 +51,6 @@ object DGILocalExample {
     dgi.setTorchModelPath(torchModelPath)
     dgi.setFeatureDim(featureDim)
     dgi.setOptimizer(optimizer)
-    dgi.setUseBalancePartition(false)
     dgi.setBatchSize(batchSize)
     dgi.setStepSize(stepSize)
     dgi.setPSPartitionNum(psNumPartition)
@@ -62,7 +61,7 @@ object DGILocalExample {
     dgi.setUseSecondOrder(second)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false)
-    val features = GCNIO.loadFeature(featureInput, sep = "\t")
+    val features = IOFunctions.loadFeature(featureInput, sep = "\t")
 
     val (model, graph) = dgi.initialize(edges, features)
     dgi.fit(model, graph)

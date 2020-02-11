@@ -14,8 +14,9 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.model
+package com.tencent.angel.pytorch.eval
+import org.apache.spark.rdd.RDD
 
-class ParGraphModel {
-
+class RMSE extends Evaluation {
+  override def calculate(pairs: RDD[(Double, Double)]): Double = ???
 }

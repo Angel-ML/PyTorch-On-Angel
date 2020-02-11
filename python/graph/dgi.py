@@ -1,21 +1,26 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+
+from __future__ import print_function
+import argparse
+
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
-from nn.conv import SAGEConv3, GCNConv2
+from nn.conv import SAGEConv3
+
 
 class DGI(torch.jit.ScriptModule):
     def __init__(self, n_in, n_h):
@@ -29,7 +34,7 @@ class DGI(torch.jit.ScriptModule):
 
     def reset_parameters(self):
         torch.nn.init.xavier_uniform_(self.weight)
-    
+
     @torch.jit.script_method
     def forward_(self, pos_x, neg_x, edge_index):
         # type: (Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor, Tensor]
@@ -39,7 +44,7 @@ class DGI(torch.jit.ScriptModule):
         neg_z = F.prelu(self.gcn(neg_x, edge_index), self.reluWeight)
         summary = torch.sigmoid(torch.mean(pos_z, dim=0))
         return pos_z, neg_z, summary
-    
+
     @torch.jit.script_method
     def loss(self, pos_z, neg_z, summary):
         r"""Computes the mutual information maximization objective."""
@@ -64,11 +69,36 @@ class DGI(torch.jit.ScriptModule):
         """
         value = torch.matmul(z, torch.matmul(self.weight, summary))
         return torch.sigmoid(value) if sigmoid else value
- 
+
     @torch.jit.script_method
     def predict_(self, x, edge_index):
         return F.prelu(self.gcn(x, edge_index), self.reluWeight)
-        
+
+
+FLAGS = None
+
+
+def main():
+    dgi = DGI(FLAGS.input_dim, FLAGS.output_dim)
+    dgi.save(FLAGS.output_file)
+
+
 if __name__ == '__main__':
-    dgi = DGI(1433, 512)
-    dgi.save('dgi_gcn.pt')
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--input_dim",
+        type=int,
+        default=-1,
+        help="input dimension of node features")
+    parser.add_argument(
+        "--output_dim",
+        type=int,
+        default=32,
+        help="output dimension of dgi")
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        default="dgi.pt",
+        help="output file name")
+    FLAGS, unparsed = parser.parse_known_args()
+    main()

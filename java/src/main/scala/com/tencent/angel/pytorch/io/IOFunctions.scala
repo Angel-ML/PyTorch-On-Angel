@@ -14,18 +14,30 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.graph.utils
+package com.tencent.angel.pytorch.io
 
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-object GCNIO {
+object IOFunctions {
+
+  def loadString(input: String, index: Int = 0): DataFrame = {
+    val ss = SparkSession.builder().getOrCreate()
+
+    val schema = StructType(Seq(
+      StructField("example", StringType, nullable = false)
+    ))
+    ss.read
+      .option("sep", "\t")
+      .option("header", "false")
+      .schema(schema)
+      .csv(input)
+  }
 
   def loadFeature(input: String,
                   nodeIndex: Int = 0, featureIndex: Int = 1,
                   sep: String = " "): DataFrame = {
     val ss = SparkSession.builder().getOrCreate()
-
 
     val schema = StructType(Seq(
       StructField("node", LongType, nullable = false),
@@ -53,5 +65,27 @@ object GCNIO {
       .csv(input)
   }
 
+  def loadEdge(input: String, isTyped: Boolean,
+               srcIndex: Int = 0, dstIndex: Int = 1, typeIndex: Int = 2,
+               sep: String = " "): DataFrame = {
+    val ss = SparkSession.builder().getOrCreate()
 
+    val schema = if (isTyped) {
+      StructType(Seq(
+        StructField("src", LongType, nullable = false),
+        StructField("dst", LongType, nullable = false),
+        StructField("type", IntegerType, nullable = false)
+      ))
+    } else {
+      StructType(Seq(
+        StructField("src", LongType, nullable = false),
+        StructField("dst", LongType, nullable = false)
+      ))
+    }
+    ss.read
+      .option("sep", sep)
+      .option("header", "false")
+      .schema(schema)
+      .csv(input)
+  }
 }

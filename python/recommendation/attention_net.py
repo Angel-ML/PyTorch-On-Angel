@@ -1,32 +1,31 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
-#!/usr/bin/env python
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+# !/usr/bin/env python
 
 from __future__ import print_function
 
 import argparse
 
 import torch
-import torch.nn.functional as F 
+import torch.nn.functional as F
 
 from torch import Tensor
 from typing import List
 
-import math
 
-class AttentionNet(torch.jit.ScriptModule):
+class AttentionNet(torch.nn.Module):
 
     def __init__(self, input_dim=-1, n_fields=-1, embedding_dim=-1, fc_dims=[]):
         super(AttentionNet, self).__init__()
@@ -36,10 +35,13 @@ class AttentionNet(torch.jit.ScriptModule):
         self.embedding_dim = embedding_dim
         self.mats = []
 
+        # local model do not need real input_dim to init params, so set fake_dim to
+        # speed up to produce local pt file.
+        fake_input_dim = 10
         if input_dim > 0 and embedding_dim > 0 and n_fields > 0 and fc_dims:
             self.bias = torch.nn.Parameter(torch.zeros(1, 1))
-            self.weights = torch.nn.Parameter(torch.zeros(input_dim, 1))
-            self.embedding = torch.nn.Parameter(torch.zeros(input_dim, embedding_dim))
+            self.weights = torch.nn.Parameter(torch.zeros(fake_input_dim, 1))
+            self.embedding = torch.nn.Parameter(torch.zeros(fake_input_dim, embedding_dim))
             torch.nn.init.xavier_normal_(self.bias)
             torch.nn.init.xavier_normal_(self.weights)
             # wq, wk, wv, w1, w1
@@ -51,19 +53,12 @@ class AttentionNet(torch.jit.ScriptModule):
             dim = n_fields * embedding_dim  # m * d
             for (index, fc_dim) in enumerate(fc_dims):
                 w = torch.nn.Parameter(torch.zeros(dim, fc_dim))
-                b = torch.nn.Parameter(torch.randn(1, 1))
-                torch.nn.init.xavier_normal_(w)
+                b = torch.nn.Parameter(torch.zeros(1, 1))
+                torch.nn.init.kaiming_normal_(w, mode='fan_in', nonlinearity='relu')
                 self.mats.append(w)
                 self.mats.append(b)
                 dim = fc_dim
 
-            self.input_dim = torch.jit.Attribute(self.input_dim, int)
-            self.n_fields = torch.jit.Attribute(self.n_fields, int)
-            self.embedding_dim = torch.jit.Attribute(self.embedding_dim, int)
-            self.mats = torch.jit.Attribute(self.mats, List[Tensor])
-
-
-    @torch.jit.script_method
     def first_order(self, batch_size, index, values, bias, weights):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         srcs = weights.view(1, -1).mul(values.view(1, -1)).view(-1)
@@ -72,7 +67,6 @@ class AttentionNet(torch.jit.ScriptModule):
         first = output + bias
         return first
 
-    @torch.jit.script_method
     def attention(self, batch_size, k, embedding, mats):
         # type: (int, int, Tensor, List[Tensor]) -> Tensor
         wq, wk, wv, w1, w2 = mats
@@ -93,7 +87,6 @@ class AttentionNet(torch.jit.ScriptModule):
         E = torch.matmul(E, w2) + V
         return E
 
-    @torch.jit.script_method
     def higher_order(self, batch_size, embedding, mats):
         # type: (int, Tensor, List[Tensor]) -> Tensor
         k = embedding.size(1)
@@ -106,14 +99,12 @@ class AttentionNet(torch.jit.ScriptModule):
 
         return e.view(-1)
 
-    @torch.jit.script_method
     def forward_(self, batch_size, index, feats, values, bias, weights, embedding, mats):
         # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         higher = self.higher_order(batch_size, embedding, mats)
         return torch.sigmoid(first + higher)
 
-    @torch.jit.script_method
     def forward(self, batch_size, index, feats, values):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
@@ -121,15 +112,15 @@ class AttentionNet(torch.jit.ScriptModule):
         return self.forward_(batch_size, index, feats, values,
                              self.bias, batch_first, batch_embedding, self.mats)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def loss(self, output, targets):
         return self.loss_fn(output, targets)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_type(self):
         return "BIAS_WEIGHT_EMBEDDING_MATS"
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_name(self):
         return "AttentionNet"
 
@@ -139,7 +130,8 @@ FLAGS = None
 
 def main():
     attention = AttentionNet(FLAGS.input_dim, FLAGS.n_fields, FLAGS.embedding_dim, FLAGS.fc_dims)
-    attention.save('attention_net.pt')
+    attention_script_module = torch.jit.script(attention)
+    attention_script_module.save("attention_net.pt")
 
 
 if __name__ == "__main__":

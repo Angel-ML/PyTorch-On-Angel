@@ -125,6 +125,10 @@
   jintArray _carray_ptr##_jarray = env->NewIntArray(len); \
   env->SetIntArrayRegion(_carray_ptr##_jarray, 0, len, reinterpret_cast<int*>(_carray_ptr));
 
+#define DEFINE_JLONGARRAY(_carray_ptr, len) \
+  jlongArray _carray_ptr##_jarray = env->NewLongArray(len); \
+  env->SetLongArrayRegion(_carray_ptr##_jarray, 0, len, reinterpret_cast<int64_t*>(_carray_ptr));
+
 
 // convert primitives between java object and c++ object
 

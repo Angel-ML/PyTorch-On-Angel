@@ -28,6 +28,8 @@ class TorchParams extends Serializable {
   var numFields: Int = -1
   var rowType: RowType = RowType.T_FLOAT_DENSE
   var matSizes: Array[Int] = Array()
+  var inputSizes: Array[Long] = Array()
+  var embeddingsSizes: Array[Int] = Array()
   val map = new mutable.HashMap[String, String]()
 
 }

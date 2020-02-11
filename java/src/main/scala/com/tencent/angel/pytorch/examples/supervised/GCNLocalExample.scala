@@ -18,7 +18,7 @@ package com.tencent.angel.pytorch.examples.supervised
 
 import com.tencent.angel.conf.AngelConf
 import com.tencent.angel.pytorch.graph.gcn.GCN
-import com.tencent.angel.pytorch.graph.utils.GCNIO
+import com.tencent.angel.pytorch.io.IOFunctions
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
 import com.tencent.angel.spark.ml.graph.utils.GraphIO
@@ -35,6 +35,7 @@ object GCNLocalExample {
     val labelPath = params.getOrElse("labelPath", "")
     val predictOutputPath = params.getOrElse("predictOutputPath", "")
     val embeddingPath = params.getOrElse("embeddingPath", "")
+    val outputModelPath = params.getOrElse("outputModelPath", "")
     val batchSize = params.getOrElse("batchSize", "100").toInt
     val torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
@@ -47,6 +48,7 @@ object GCNLocalExample {
     val testRatio = params.getOrElse("testRatio", "0.5").toFloat
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
     val format = params.getOrElse("format", "sparse")
+    val actionType = params.getOrElse("actionType", "train")
 
     start()
 
@@ -66,21 +68,21 @@ object GCNLocalExample {
     gcn.setDataFormat(format)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false)
-    val features = GCNIO.loadFeature(featureInput, sep = "\t")
-    val labels = GCNIO.loadLabel(labelPath)
+    val features = IOFunctions.loadFeature(featureInput, sep = "\t")
+    val labels = IOFunctions.loadLabel(labelPath)
 
     val (model, graph) = gcn.initialize(edges, features, Option(labels))
-    gcn.fit(model, graph)
+
+    if (actionType == "train")
+      gcn.fit(model, graph)
 
     if (predictOutputPath.length > 0) {
-      val predict = gcn.genLabels(model, graph)
-      GraphIO.save(predict, predictOutputPath, seq = " ")
+      val embedPred = gcn.genLabelsEmbedding(model, graph)
+      GraphIO.save(embedPred, predictOutputPath, seq = " ")
     }
 
-    if (embeddingPath.length > 0) {
-      val embedding = gcn.genEmbedding(model, graph)
-      GraphIO.save(embedding, embeddingPath, seq = " ")
-    }
+    if (actionType == "train" && outputModelPath.length > 0)
+      gcn.save(model, outputModelPath)
 
     stop()
   }

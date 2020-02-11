@@ -38,9 +38,19 @@ public class SampleParser {
     }
   }
 
-  public static Tuple2<CooLongFloatMatrix, float[]> parseLIBSVM(String[] lines) {
+  public static Tuple3<CooLongFloatMatrix, long[], String[]> parsePredict(String[] lines, String type) {
+    if (TorchModelType.withName(type) == TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD())
+      return parseLIBFFMPredict(lines);
+    else {
+      Tuple2<CooLongFloatMatrix, String[]> tuple2 = parseLIBSVMPredict(lines);
+      return new Tuple3<CooLongFloatMatrix, long[], String[]>(tuple2._1, null, tuple2._2);
+    }
+  }
+
+  private static Tuple2<CooLongFloatMatrix, float[]> parseLIBSVM(String[] lines) {
     LongArrayList rows = new LongArrayList();
     LongArrayList cols = new LongArrayList();
+    LongArrayList fields = null;
     FloatArrayList vals = new FloatArrayList();
     float[] targets = new float[lines.length];
 
@@ -64,12 +74,12 @@ public class SampleParser {
     }
 
     CooLongFloatMatrix coo = MFactory.cooLongFloatMatrix(rows.toLongArray(),
-      cols.toLongArray(), vals.toFloatArray(), null);
+            cols.toLongArray(), vals.toFloatArray(), null);
 
     return new Tuple2<CooLongFloatMatrix, float[]>(coo, targets);
   }
 
-  public static Tuple3<CooLongFloatMatrix, long[], float[]> parseLIBFFM(String[] lines) {
+  private static Tuple3<CooLongFloatMatrix, long[], float[]> parseLIBFFM(String[] lines) {
     LongArrayList rows = new LongArrayList();
     LongArrayList cols = new LongArrayList();
     LongArrayList fields = new LongArrayList();
@@ -98,9 +108,72 @@ public class SampleParser {
     }
 
     CooLongFloatMatrix coo = MFactory.cooLongFloatMatrix(rows.toLongArray(),
-      cols.toLongArray(), vals.toFloatArray(), null);
+            cols.toLongArray(), vals.toFloatArray(), null);
 
     return new Tuple3<CooLongFloatMatrix, long[], float[]>(coo, fields.toLongArray(), targets);
+  }
+
+  private static Tuple2<CooLongFloatMatrix, String[]> parseLIBSVMPredict(String[] lines) {
+    LongArrayList rows = new LongArrayList();
+    LongArrayList cols = new LongArrayList();
+    FloatArrayList vals = new FloatArrayList();
+    String[] targets = new String[lines.length];
+
+    int index = 0;
+    for (int i = 0; i < lines.length; i++) {
+      String[] parts = lines[i].split(" ");
+      targets[i] = parts[0];
+
+      for (int j = 1; j < parts.length; j++) {
+        String[] kv = parts[j].split(":");
+        long key = Long.parseLong(kv[0]) - 1;
+        float val = Float.parseFloat(kv[1]);
+
+        rows.add(index);
+        cols.add(key);
+        vals.add(val);
+      }
+
+      index++;
+    }
+
+    CooLongFloatMatrix coo = MFactory.cooLongFloatMatrix(rows.toLongArray(),
+            cols.toLongArray(), vals.toFloatArray(), null);
+
+    return new Tuple2<CooLongFloatMatrix, String[]>(coo, targets);
+  }
+
+  private static Tuple3<CooLongFloatMatrix, long[], String[]> parseLIBFFMPredict(String[] lines) {
+    LongArrayList rows = new LongArrayList();
+    LongArrayList cols = new LongArrayList();
+    LongArrayList fields = new LongArrayList();
+    FloatArrayList vals = new FloatArrayList();
+    String[] targets = new String[lines.length];
+
+    int index = 0;
+    for (int i = 0; i < lines.length; i++) {
+      String[] parts = lines[i].split(" ");
+      targets[i] = parts[0];
+
+      for (int j = 1; j < parts.length; j++) {
+        String[] fkv = parts[j].split(":");
+        long field = Long.parseLong(fkv[0]);
+        long key = Long.parseLong(fkv[1]) - 1;
+        float val = Float.parseFloat(fkv[2]);
+
+        rows.add(index);
+        fields.add(field);
+        cols.add(key);
+        vals.add(val);
+      }
+
+      index++;
+    }
+
+    CooLongFloatMatrix coo = MFactory.cooLongFloatMatrix(rows.toLongArray(),
+            cols.toLongArray(), vals.toFloatArray(), null);
+
+    return new Tuple3<CooLongFloatMatrix, long[], String[]>(coo, fields.toLongArray(), targets);
   }
 
   public static Tuple2<Long, IntFloatVector> parseNodeFeature(String line, int dim, String format) {
@@ -176,7 +249,7 @@ public class SampleParser {
   public static IntFloatVector parseDenseIntFloat(String line, int dim) {
     String[] parts = line.split(" ");
     if (parts.length != dim)
-      throw new AngelException("number elements of feature should be equal with dim");
+      throw new AngelException("number elements " + parts.length + " should be equal with dim " + dim);
 
     float[] vals = new float[parts.length];
     for (int i = 0; i < parts.length; i++)

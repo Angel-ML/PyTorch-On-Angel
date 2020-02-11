@@ -1,18 +1,18 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
-#!/usr/bin/env python
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+# !/usr/bin/env python
 
 from __future__ import print_function
 
@@ -22,8 +22,7 @@ import torch
 import torch.nn.functional as F
 
 
-## model
-class FactorizationMachine(torch.jit.ScriptModule):
+class FactorizationMachine(torch.nn.Module):
 
     def __init__(self, input_dim=-1, embedding_dim=-1):
         super(FactorizationMachine, self).__init__()
@@ -31,20 +30,19 @@ class FactorizationMachine(torch.jit.ScriptModule):
         self.input_dim = input_dim
         self.embedding_dim = embedding_dim
 
+        # local model do not need real input_dim to init params, so set fake_input_dim to
+        # speed up to produce local pt file.
+        fake_input_dim = 10
         if input_dim > 0 and embedding_dim > 0:
             self.bias = torch.randn(1, 1, dtype=torch.float32)
-            self.weights = torch.randn(input_dim, 1)
-            self.embedding = torch.randn(input_dim, embedding_dim)
+            self.weights = torch.randn(fake_input_dim, 1)
+            self.embedding = torch.randn(fake_input_dim, embedding_dim)
             self.bias = torch.nn.Parameter(self.bias, requires_grad=True)
             self.weights = torch.nn.Parameter(self.weights, requires_grad=True)
             self.embedding = torch.nn.Parameter(self.embedding, requires_grad=True)
             torch.nn.init.xavier_uniform_(self.weights)
             torch.nn.init.xavier_uniform_(self.embedding)
 
-            self.input_dim = torch.jit.Attribute(self.input_dim, int)
-            self.embedding_dim = torch.jit.Attribute(self.embedding_dim, int)
-
-    @torch.jit.script_method
     def first_order(self, batch_size, index, values, bias, weights):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         size = batch_size
@@ -54,7 +52,6 @@ class FactorizationMachine(torch.jit.ScriptModule):
         first = output + bias
         return first
 
-    @torch.jit.script_method
     def second_order(self, batch_size, index, values, embeddings):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         k = embeddings.size(1)
@@ -84,29 +81,27 @@ class FactorizationMachine(torch.jit.ScriptModule):
         second = t1.sub(t2).transpose_(0, 1).sum(1).mul(0.5)
         return second
 
-    @torch.jit.script_method
     def forward_(self, batch_size, index, feats, values, bias, weights, embeddings):
         # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
         second = self.second_order(batch_size, index, values, embeddings)
         return torch.sigmoid(first + second)
 
-    @torch.jit.script_method
     def forward(self, batch_size, index, feats, values):
         # type: (int, Tensor, Tensor, Tensor) -> Tensor
         batch_first = F.embedding(feats, self.weights)
         batch_second = F.embedding(feats, self.embedding)
         return self.forward_(batch_size, index, feats, values, self.bias, batch_first, batch_second)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def loss(self, output, targets):
         return self.loss_fn(output, targets)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_type(self):
         return "BIAS_WEIGHT_EMBEDDING"
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_name(self):
         return "FactorizationMachine"
 
@@ -116,7 +111,8 @@ FLAGS = None
 
 def main():
     fm = FactorizationMachine(FLAGS.input_dim, FLAGS.embedding_dim)
-    fm.save("fm.pt")
+    fm_script_module = torch.jit.script(fm)
+    fm_script_module.save("fm.pt")
 
 
 if __name__ == "__main__":

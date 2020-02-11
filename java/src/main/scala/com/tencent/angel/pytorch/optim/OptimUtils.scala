@@ -18,14 +18,15 @@ package com.tencent.angel.pytorch.optim
 
 object OptimUtils {
 
-  def apply(optim: String, stepSize: Double): AsyncOptim = {
+  def apply(optim: String, eta: Double, decay: Double): AsyncOptim = {
     optim.toLowerCase match {
-      case "sgd" => new AsyncSGD(stepSize)
-      case "adam" => new AsyncAdam(stepSize)
-      case "adagrad" => new AsyncAdagrad(stepSize)
-      case "momentum" => new AsyncMomentum(stepSize)
+      case "sgd" => new AsyncSGD(eta, decay)
+      case "adam" => new AsyncAdam(eta, decay)
+      case "adagrad" => new AsyncAdagrad(eta, decay)
+      case "momentum" => new AsyncMomentum(eta, decay)
     }
   }
 
 
 }
+

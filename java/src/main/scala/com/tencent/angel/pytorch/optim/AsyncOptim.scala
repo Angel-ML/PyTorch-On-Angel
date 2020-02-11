@@ -22,25 +22,37 @@ import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
-abstract class AsyncOptim extends Serializable {
+abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
+
+  protected var numSteps: Int = 1
 
   def update(vector: PSVector, offset: Int, grad: Vector) = {
-    asycUpdate(vector, offset, grad).get
+    asyncUpdate(vector, offset, grad).get
   }
 
   def update(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]) = {
-    asycUpdate(matrix, offset, rowIds, grads).get
+    asyncUpdate(matrix, offset, rowIds, grads).get
   }
 
   def update(matrix: PSMatrix, offset: Int, grads: Array[Vector]) = {
-    asycUpdate(matrix, offset, grads).get
+    asyncUpdate(matrix, offset, grads).get
   }
 
-  def asycUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult]
+  def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult]
 
-  def asycUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult]
+  def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult]
 
-  def asycUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult]
+  def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult]
 
   def getNumSlots(): Int
+
+  def step(num: Int): Unit = numSteps += num
+
+  def getCurrentStep: Int = numSteps
+
+  def getCurrentEta: Double = eta / (1 + (numSteps - 1) * decay)
+
+  override def toString: String = {
+    s"eta=$eta decay=$decay"
+  }
 }

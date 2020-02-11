@@ -14,24 +14,17 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.examples
+package com.tencent.angel.pytorch.params
 
-import com.tencent.angel.pytorch.native.LibraryLoader
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
-object ClusterLoad {
+trait HasAsync extends Params {
 
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf()
-    val sc = new SparkContext(conf)
+  final val async = new BooleanParam(this, "async", "async")
 
-    sc.makeRDD(Array(0, 1, 2, 3), 2).mapPartitions {
-      case iterator =>
-        LibraryLoader.load
-        Iterator.single(1)
-    }.count()
+  final def useAsync: Boolean = $(async)
 
-    Thread.sleep(100000)
-  }
+  setDefault(async, true)
 
+  final def setAsync(value: Boolean): this.type = set(async, value)
 }

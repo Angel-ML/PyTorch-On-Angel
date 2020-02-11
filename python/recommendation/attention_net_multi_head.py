@@ -1,18 +1,18 @@
- # Tencent is pleased to support the open source community by making Angel available.
- #
- # Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
- #
- # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
- # compliance with the License. You may obtain a copy of the License at
- #
- # https://opensource.org/licenses/Apache-2.0
- #
- # Unless required by applicable law or agreed to in writing, software distributed under the License
- # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- # or implied. See the License for the specific language governing permissions and limitations under
- # the License.
- #
-#!/usr/bin/env python
+# Tencent is pleased to support the open source community by making Angel available.
+#
+# Copyright (C) 2017-2018 THL A29 Limited, a Tencent company. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+# compliance with the License. You may obtain a copy of the License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+# !/usr/bin/env python
 
 from __future__ import print_function
 
@@ -21,11 +21,10 @@ import torch.nn.functional as F
 
 from torch import Tensor
 from typing import List
+import argparse
 
-import math
 
-
-class AttentionNetMultiHead(torch.jit.ScriptModule):
+class AttentionNetMultiHead(torch.nn.Module):
 
     def __init__(self, input_dim=-1, n_fields=-1, embedding_dim=-1, num_multi_head=-1,
                  top_k=-1, num_attention_layers=-1, fc_dims=[]):
@@ -39,11 +38,14 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         self.num_attention_layers = num_attention_layers
         self.mats = []
 
+        # local model do not need real input_dim to init params, so set fake_dim to
+        # speed up to produce local pt file.
+        fake_input_dim = 10
         if input_dim > 0 and embedding_dim > 0 and n_fields > 0 and num_multi_head > 0 \
                 and top_k > 0 and num_attention_layers > 0 and fc_dims:
             self.bias = torch.nn.Parameter(torch.zeros(1, 1))
-            self.weights = torch.nn.Parameter(torch.zeros(input_dim, 1))
-            self.embedding = torch.nn.Parameter(torch.zeros(input_dim, embedding_dim))
+            self.weights = torch.nn.Parameter(torch.zeros(fake_input_dim, 1))
+            self.embedding = torch.nn.Parameter(torch.zeros(fake_input_dim, embedding_dim))
             torch.nn.init.xavier_normal_(self.weights)
             torch.nn.init.xavier_normal_(self.embedding)
 
@@ -51,7 +53,7 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
             for i in range(5 * num_attention_layers):
                 w = torch.zeros(num_multi_head, embedding_dim, embedding_dim)
                 torch.nn.init.xavier_normal_(w)
-                self.mats.append(w.view(num_multi_head, embedding_dim*embedding_dim))
+                self.mats.append(w.view(num_multi_head, embedding_dim * embedding_dim))
 
             dim = n_fields * embedding_dim  # m * d
             for (index, fc_dim) in enumerate(fc_dims):
@@ -62,15 +64,6 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
                 self.mats.append(b)
                 dim = fc_dim
 
-            self.input_dim = torch.jit.Attribute(self.input_dim, int)
-            self.n_fields = torch.jit.Attribute(self.n_fields, int)
-            self.embedding_dim = torch.jit.Attribute(self.embedding_dim, int)
-            self.num_multi_head = torch.jit.Attribute(self.num_multi_head, int)
-            self.top_k = torch.jit.Attribute(self.top_k, int)
-            self.num_attention_layers = torch.jit.Attribute(self.num_attention_layers, int)
-            self.mats = torch.jit.Attribute(self.mats, List[Tensor])
-
-    @torch.jit.script_method
     def first_order(self, batch_size, index, values, bias, weights):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         srcs = weights.view(1, -1).mul(values.view(1, -1)).view(-1)
@@ -79,7 +72,6 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         first = output + bias
         return first
 
-    @torch.jit.script_method
     def attention(self, batch_size, k, embedding, num_multi_head, top_k, n_fields, mats):
         # type: (int, int, Tensor, int, int, int, List[Tensor]) -> Tensor
         assert top_k <= n_fields
@@ -110,7 +102,6 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         E = E.sum(1)
         return E
 
-    @torch.jit.script_method
     def higher_order(self, batch_size, embedding, num_multi_head, top_k, n_fields, num_attention_layers, mats):
         # type: (int, Tensor, int, int, int, int, List[Tensor]) -> Tensor
         k = embedding.size(1)
@@ -126,7 +117,6 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
 
         return e.view(-1)
 
-    @torch.jit.script_method
     def forward_(self, batch_size, index, feats, values, bias, weights, embedding, mats):
         # type: (int, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, List[Tensor]) -> Tensor
         first = self.first_order(batch_size, index, values, bias, weights)
@@ -141,19 +131,74 @@ class AttentionNetMultiHead(torch.jit.ScriptModule):
         return self.forward_(batch_size, index, feats, values, self.bias, batch_first,
                              batch_embedding, self.mats)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def loss(self, output, targets):
         return self.loss_fn(output, targets)
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_type(self):
         return "BIAS_WEIGHT_EMBEDDING_MATS"
 
-    @torch.jit.script_method
+    @torch.jit.export
     def get_name(self):
         return "AttentionNetMultiHead"
 
 
-if __name__ == '__main__':
-    attention = AttentionNetMultiHead()
-    attention.save('attention_net_multi_head.pt')
+FLAGS = None
+
+
+def main():
+    attention = AttentionNetMultiHead(FLAGS.input_dim, FLAGS.n_fields, FLAGS.embedding_dim, FLAGS.num_multi_head,
+                                      FLAGS.top_k, FLAGS.num_attention_layers, FLAGS.fc_dims)
+    attention_script_module = torch.jit.script(attention)
+    attention_script_module.save('attention_net_multi_head.pt')
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.register("type", "bool", lambda v: v.lower() == "true")
+    parser.add_argument(
+        "--input_dim",
+        type=int,
+        default=-1,
+        help="data input dim."
+    )
+    parser.add_argument(
+        "--n_fields",
+        type=int,
+        default=-1,
+        help="data num fields."
+    )
+    parser.add_argument(
+        "--embedding_dim",
+        type=int,
+        default=-1,
+        help="embedding dim."
+    )
+    parser.add_argument(
+        "--num_multi_head",
+        type=int,
+        default=-1,
+        help="num head."
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=-1,
+        help="top k."
+    )
+    parser.add_argument(
+        "--num_attention_layers",
+        type=int,
+        default=-1,
+        help="num attention layers."
+    )
+    parser.add_argument(
+        "--fc_dims",
+        nargs="+",
+        type=int,
+        default=-1,
+        help="fc layers dim list."
+    )
+    FLAGS, unparsed = parser.parse_known_args()
+    main()
