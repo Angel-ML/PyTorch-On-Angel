@@ -34,11 +34,14 @@ The methods are similar for other algorithms.
     This python script will generate a TorchScript model with the structure of dataflow graph for deepfm. This file is named ``deepfm.pt``.
 
 2. ** Preparing the input data**
-    The input data of DeepFM should be libffm format. Each line of the input data represents one data sample.
+    The input data of DeepFM should be libsvm or libffm format. Each line of the input data represents one data sample.
+    ```
+    label feature1:value1 feature2:value2
+    ```
+    In Pytorch on angel, multi-hot field is allowed, which means some field can be appeared multi-times in one data example.
     ```
     label field1:feature1:value1 field2:feature2:value2
     ```
-    In Pytorch on angel, multi-hot field is allowed, which means some field can be appeared multi-times in one data example.
 
 3. ** Training model**
     After obtaining the model file (deepfm.pt) and the input data, we can submit a task through Spark on Angel to train the model. The command is:
@@ -66,19 +69,19 @@ The methods are similar for other algorithms.
           --num-executors 5 \
           --executor-cores 1 \
           --executor-memory 5g \
-          --class com.tencent.angel.pytorch.examples.ClusterExample \
-          ./pytorch-on-angel-1.0-SNAPSHOT.jar \   # jar from Compiling java submodule
-          input:$input batchSize:128 torchModelPath:deepfm.pt \
-          stepSize:0.001 numEpoch:10 validateRatio:0.2 \
-          modelPath:$output \
+          --class com.tencent.angel.pytorch.examples.supervised.RecommendationExample \
+          ./pytorch-on-angel-*.jar \   # jar from Compiling java submodule
+          trainInput:$input batchSize:128 torchModelPath:deepfm.pt \
+          stepSize:0.001 numEpoch:10 testRatio:0.1 \
+          angelModelOutputPath:$output \
     ```
 
     Description for the parameters:
 
-    - input: the input path (hdfs) for training data
+    - trainInput: the input path (hdfs) for training data
     - batchSize: batch size for each optimizing step
     - torchModelPath: the name of the generated torch model
     - stepSize: learning rate
     - numEpoch: how many epoches for the training process
-    - validateRatio: how many training examples are used for testing
-    - modelPath: the output path (hdfs) for the training model
+    - testRatio: how many training examples are used for testing
+    - angelModelOutputPath: the output path (hdfs) for the training model

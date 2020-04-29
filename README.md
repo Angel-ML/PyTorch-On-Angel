@@ -39,7 +39,7 @@ If you don't have a docker environment, you can compile it manually, but you nee
 
 #### Install Pytorch
 
-  - pytorch =v1.2.0 
+  - pytorch =v1.3.1 
  
 we recommend using [anaconda](https://www.anaconda.com/) to install pytorch, run command:
 ```$xslt
@@ -86,8 +86,8 @@ pytorch detailed installation documentation can refer to [pytorch installation](
 ### Quick Start
 
 #### Spark on Angel deployment
-PyTorch on angel runs on spark on angel, so you must deploy the spark on angel client first. The specific deployment process can refer to [documentation](https://github.com/Angel-ML/angel/blob/branch-2.3.1/docs/tutorials/spark_on_angel_quick_start_en.md).  
-note: **PyTorch on Angel only support run on Angel 2.3.0 or 2.3.1**
+PyTorch on angel runs on spark on angel, so you must deploy the spark on angel client first. The specific deployment process can refer to [documentation](https://github.com/Angel-ML/angel/blob/branch-2.4.0/docs/tutorials/spark_on_angel_quick_start.md).  
+note: **PyTorch on Angel only support run on Angel 2.4.0**
 
 #### Submit to Cluster
 Use `$SPARK_HOME/bin/spark-submit` to submit the application to cluster in the pytorch on angel client.   
@@ -128,11 +128,11 @@ Here are the submit example for deepfm.
           --num-executors 5 \
           --executor-cores 1 \
           --executor-memory 5g \
-          --class com.tencent.angel.pytorch.examples.ClusterExample \
+          --class com.tencent.angel.pytorch.examples.supervised.RecommendationExample \
           ./pytorch-on-angel-*.jar \  
-          input:$input batchSize:128 torchModelPath:deepfm.pt \
-          stepSize:0.001 numEpoch:10 partitionNum:5 \
-          modulePath:$output \
+          trainInput:$input batchSize:128 torchModelPath:deepfm.pt \
+          stepSize:0.001 numEpoch:10 testRatio:0.1 \
+          angelModelOutputPath:$output \
    ```
 
 ### Algorithms
