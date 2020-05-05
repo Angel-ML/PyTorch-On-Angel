@@ -14,10 +14,10 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.examples.supervised
+package com.tencent.angel.pytorch.examples.unsupervised.local
 
 import com.tencent.angel.conf.AngelConf
-import com.tencent.angel.pytorch.graph.gcn.GCN
+import com.tencent.angel.pytorch.graph.gcn.DGI
 import com.tencent.angel.pytorch.io.IOFunctions
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
@@ -26,63 +26,50 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.language.existentials
 
-object GCNLocalExample {
+object DGILocalExample {
 
   def main(args: Array[String]): Unit = {
     val params = ArgsUtil.parse(args)
     val edgeInput = params.getOrElse("edgePath", "")
     val featureInput = params.getOrElse("featurePath", "")
-    val labelPath = params.getOrElse("labelPath", "")
-    val predictOutputPath = params.getOrElse("predictOutputPath", "")
     val embeddingPath = params.getOrElse("embeddingPath", "")
-    val outputModelPath = params.getOrElse("outputModelPath", "")
     val batchSize = params.getOrElse("batchSize", "100").toInt
     val torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
     val featureDim = params.getOrElse("featureDim", "-1").toInt
     val optimizer = params.getOrElse("optimizer", "adam")
     val psNumPartition = params.getOrElse("psNumPartition", "10").toInt
-    val numPartitions = params.getOrElse("numPartitions", "1").toInt
+    val numPartitions = params.getOrElse("numPartitions", "5").toInt
     val useBalancePartition = params.getOrElse("useBalancePartition", "false").toBoolean
     val numEpoch = params.getOrElse("numEpoch", "10").toInt
-    val testRatio = params.getOrElse("testRatio", "0.5").toFloat
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
-    val format = params.getOrElse("format", "sparse")
-    val actionType = params.getOrElse("actionType", "train")
+    val second = params.getOrElse("second", "false").toBoolean
 
     start()
 
-    val gcn = new GCN()
-    gcn.setTorchModelPath(torchModelPath)
-    gcn.setFeatureDim(featureDim)
-    gcn.setOptimizer(optimizer)
-    gcn.setUseBalancePartition(false)
-    gcn.setBatchSize(batchSize)
-    gcn.setStepSize(stepSize)
-    gcn.setPSPartitionNum(psNumPartition)
-    gcn.setPartitionNum(numPartitions)
-    gcn.setUseBalancePartition(useBalancePartition)
-    gcn.setNumEpoch(numEpoch)
-    gcn.setStorageLevel(storageLevel)
-    gcn.setTestRatio(testRatio)
-    gcn.setDataFormat(format)
+    val dgi = new DGI()
+    dgi.setTorchModelPath(torchModelPath)
+    dgi.setFeatureDim(featureDim)
+    dgi.setOptimizer(optimizer)
+    dgi.setBatchSize(batchSize)
+    dgi.setStepSize(stepSize)
+    dgi.setPSPartitionNum(psNumPartition)
+    dgi.setPartitionNum(numPartitions)
+    dgi.setUseBalancePartition(useBalancePartition)
+    dgi.setNumEpoch(numEpoch)
+    dgi.setStorageLevel(storageLevel)
+    dgi.setUseSecondOrder(second)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
-    val labels = IOFunctions.loadLabel(labelPath)
 
-    val (model, graph) = gcn.initialize(edges, features, Option(labels))
+    val (model, graph) = dgi.initialize(edges, features)
+    dgi.fit(model, graph)
 
-    if (actionType == "train")
-      gcn.fit(model, graph)
-
-    if (predictOutputPath.length > 0) {
-      val embedPred = gcn.genLabelsEmbedding(model, graph)
-      GraphIO.save(embedPred, predictOutputPath, seq = " ")
+    if (embeddingPath.length > 0) {
+      val embedding = dgi.genEmbedding(model, graph)
+      GraphIO.save(embedding, embeddingPath, seq = " ")
     }
-
-    if (actionType == "train" && outputModelPath.length > 0)
-      gcn.save(model, outputModelPath)
 
     stop()
   }

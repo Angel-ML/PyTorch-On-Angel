@@ -17,6 +17,11 @@
 package com.tencent.angel.pytorch.eval
 import org.apache.spark.rdd.RDD
 
+import scala.math.{pow, sqrt}
+
 class RMSE extends Evaluation {
-  override def calculate(pairs: RDD[(Double, Double)]): Double = ???
+  override def calculate(pairs: RDD[(Double, Double)]): Double = {
+    val (se, total) = pairs.map(f => (pow(f._2 - f._1, 2), 1.0)).reduce((f1, f2) => (f1._1 + f2._1, f1._2 + f2._2))
+    sqrt(se / total)
+  }
 }

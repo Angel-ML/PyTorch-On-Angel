@@ -30,7 +30,7 @@ object CheckpointUtils {
     * @param checkpointId checkpoint id
     * @param names        matrices names
     */
-  def checkpoint(checkpointId: Int, names: Array[String]) = {
+  def checkpoint(checkpointId: Int, names: Array[String]): Unit = {
     val saveContext = new ModelSaveContext()
     names.foreach(matrix => {
       saveContext.addMatrix(new MatrixSaveContext(matrix, classOf[SnapshotFormat].getTypeName))
