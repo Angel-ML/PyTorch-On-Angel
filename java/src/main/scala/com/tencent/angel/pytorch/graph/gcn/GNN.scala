@@ -55,8 +55,9 @@ class GNN(val uid: String) extends Serializable
       .map(row => (row.getLong(0), row.getString(1)))
       .filter(f => f._1 >= minId && f._1 <= maxId)
       .map(f => (f._1, SampleParser.parseFeature(f._2, $(featureDim), $(dataFormat))))
+      .repartition($(partitionNum))
       .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeFeaturePartition.apply(index, it)))
+        Iterator.single(NodeFeaturePartition.apply(index, it)))
       .map(_.init(model, $(numBatchInit))).count()
   }
 
@@ -64,7 +65,7 @@ class GNN(val uid: String) extends Serializable
     labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
       .filter(f => f._1 >= minId && f._1 <= maxId)
       .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeLabelPartition.apply(index, it, model.dim)))
+        Iterator.single(NodeLabelPartition.apply(index, it, model.dim)))
       .map(_.init(model)).count()
   }
 
@@ -72,7 +73,7 @@ class GNN(val uid: String) extends Serializable
     labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
       .filter(f => f._1 >= minId && f._1 <= maxId)
       .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeLabelPartition.apply(index, it, model.dim)))
+        Iterator.single(NodeLabelPartition.apply(index, it, model.dim)))
       .map(_.initTestLabels(model)).count()
   }
 
