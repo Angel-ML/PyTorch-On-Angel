@@ -45,7 +45,7 @@ def gen(src, index, dim=-1, out=None, dim_size=None, fill_value=0):
         out_size = list(src.size())
         dim_size = maybe_dim_size(index, dim_size)
         out_size[dim] = dim_size
-        out = torch.empty(out_size, dtype=src.dtype)
+        out = torch.empty(out_size, dtype=src.dtype, device="cuda")
         out.fill_(fill_value)
 
     return src, out, index, dim

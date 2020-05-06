@@ -47,7 +47,7 @@ class FactorizationMachine(torch.nn.Module):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         size = batch_size
         srcs = weights.view(1, -1).mul(values.view(1, -1)).view(-1)
-        output = torch.zeros(size, dtype=torch.float32)
+        output = torch.zeros(size, dtype=torch.float32, device="cuda")
         output.scatter_add_(0, index, srcs)
         first = output + bias
         return first

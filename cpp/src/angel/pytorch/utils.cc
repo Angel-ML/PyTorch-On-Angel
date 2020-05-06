@@ -82,8 +82,13 @@ namespace angel {
                    const std::string& key) {
       jboolean is_copy;
       void* c_ptr = env->GetPrimitiveArrayCritical(array, &is_copy);
-      auto tensor = torch::from_blob(c_ptr, sizes, option);
-      inputs->emplace_back(tensor);
+      if(option.requires_grad()) {
+        auto tensor = torch::from_blob(c_ptr, sizes).to(torch::kCUDA, option.dtype()).set_requires_grad(option.requires_grad());
+        inputs->emplace_back(tensor);
+      } else {
+        auto tensor = torch::from_blob(c_ptr, sizes, option).to(at::kCUDA);
+        inputs->emplace_back(tensor);
+      }
       ptrs->push_back(std::make_pair(key, c_ptr));
     }
 
@@ -109,7 +114,8 @@ namespace angel {
 
       std::vector<at::Tensor> tensors;
       for (int i = 0; i < n_size; i += 2) {
-        auto t = torch::from_blob(p_fdata, {p_isize[i], p_isize[i + 1]}, option);
+        auto t = torch::from_blob(p_fdata, {p_isize[i], p_isize[i + 1]})
+                .to(torch::kCUDA, option.dtype()).set_requires_grad(option.requires_grad());
         tensors.push_back(t);
         p_fdata += p_isize[i] * p_isize[i + 1];
       }
@@ -208,7 +214,7 @@ namespace angel {
         if (inputs[i].isTensor() && inputs[i].toTensor().grad().defined()) {
           auto array = (jarray) jni_map_get(env, params, ptrs[i].first);
           env->SetFloatArrayRegion((jfloatArray) array, 0, env->GetArrayLength(array),
-                                   inputs[i].toTensor().grad().data_ptr<float>());
+                                   inputs[i].toTensor().grad().to(at::kCPU).data_ptr<float>());
         } else if (inputs[i].isTensorList()) {
           auto list = inputs[i].toTensorList();
           auto array = jni_map_get(env, params, ptrs[i].first);
@@ -216,14 +222,14 @@ namespace angel {
             int start = 0;
             for (size_t pos = 0; pos < list.size(); pos++) {
               int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-              env->SetFloatArrayRegion((jfloatArray)array, start, len, list.get(pos).grad().data_ptr<float>());
+              env->SetFloatArrayRegion((jfloatArray)array, start, len, list.get(pos).grad().to(at::kCPU).data_ptr<float>());
               start += len;
             }
           } else {
             for (size_t pos = 0; pos < list.size(); pos++) {
               auto embedding_array = (jfloatArray)env->GetObjectArrayElement((jobjectArray)array, (jsize)pos);
               int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-              env->SetFloatArrayRegion(embedding_array, 0, len, list.get(pos).grad().data_ptr<float>());
+              env->SetFloatArrayRegion(embedding_array, 0, len, list.get(pos).grad().to(at::kCPU).data_ptr<float>());
               env->SetObjectArrayElement((jobjectArray)array, (jsize)pos, embedding_array);
             }
             break;

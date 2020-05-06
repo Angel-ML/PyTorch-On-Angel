@@ -281,7 +281,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
             add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "fields");
         }
         auto output = ptr->serving_forward(inputs);
-        auto output_ptr = output.data_ptr();
+        auto output_ptr = output.to(at::kCPU).data_ptr();
         DEFINE_JFLOATARRAY(output_ptr, batch_size);
 
         // release java arrays
@@ -290,7 +290,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
     } else {
         add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
         auto output = ptr->forward(inputs).toTensor();
-        auto output_ptr = output.data_ptr();
+        auto output_ptr = output.to(at::kCPU).data_ptr();
         DEFINE_JFLOATARRAY(output_ptr, batch_size);
 
         // release java arrays
@@ -512,10 +512,10 @@ JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
     jarray joutput;
     if (output.dtype().id() == caffe2::TypeIdentifier::Get<float>()) {
         joutput = env->NewFloatArray(static_cast<jsize>(output.numel()));
-        env->SetFloatArrayRegion((jfloatArray)joutput, 0, static_cast<jsize>(output.numel()), output.data_ptr<float>());
+        env->SetFloatArrayRegion((jfloatArray)joutput, 0, static_cast<jsize>(output.numel()), output.to(at::kCPU).data_ptr<float>());
     } else if (output.dtype().id() == caffe2::TypeIdentifier::Get<int64_t>()) {
         joutput = env->NewLongArray(static_cast<jsize>(output.numel()));
-        env->SetLongArrayRegion((jlongArray)joutput, 0, static_cast<jsize>(output.numel()), output.data_ptr<int64_t>());
+        env->SetLongArrayRegion((jlongArray)joutput, 0, static_cast<jsize>(output.numel()), output.to(at::kCPU).data_ptr<int64_t>());
     } else
         throw std::logic_error("the dtype for predict should be float or int64");
 
@@ -556,7 +556,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getParameters
 
     int start = 0;
     for (auto const& t: tensors) {
-        env->SetFloatArrayRegion(array, start, static_cast<jsize>(t.size(0)), t.data_ptr<float>());
+        env->SetFloatArrayRegion(array, start, static_cast<jsize>(t.size(0)), t.to(at::kCPU).data_ptr<float>());
         start += t.size(0);
     }
 

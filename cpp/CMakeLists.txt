@@ -3,10 +3,10 @@ project(torch_on_angel)
 
 set(CMAKE_CXX_STANDARD 14)
 
-#set libtorch path
-#set(TORCH_HOME "/path/to/libtorch")
-#set(TORCH_HOME $ENV{TORCH_HOME})
-set(TORCH_HOME "/Users/ouyangwen/software/libtorch-1.3/libtorch")
+### set libtorch path
+set(TORCH_HOME "/path/to/libtorch")
+set(TORCH_HOME $ENV{TORCH_HOME})
+#set(TORCH_HOME "/Users/ouyangwen/software/libtorch-1.3/libtorch")
 set(CMAKE_PREFIX_PATH ${TORCH_HOME})
 
 find_package(Torch REQUIRED)

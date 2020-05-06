@@ -62,7 +62,7 @@ namespace angel {
         auto *ptr = reinterpret_cast<float *>(data_ptr);
         for (auto const &m : module_.get_modules()) {
             for (auto const &p : m.get_parameters()) {
-                auto tensor = p.value().toTensor();
+                auto tensor = p.value().toTensor().to(at::kCPU);
                 auto len = static_cast<size_t>(tensor.numel());
                 memcpy(tensor.data_ptr(), reinterpret_cast<void*>(ptr), len * sizeof(float));
                 ptr += len;
@@ -70,7 +70,7 @@ namespace angel {
         }
         // parameter from this module
         for (auto const &it: module_.get_parameters()) {
-            auto tensor = it.value().toTensor();
+            auto tensor = it.value().toTensor().to(at::kCPU);
             auto len = static_cast<size_t>(tensor.numel());
             memcpy(tensor.data_ptr(), reinterpret_cast<void*>(ptr), len * sizeof(float));
             ptr += len;
@@ -89,7 +89,7 @@ namespace angel {
                 int64_t len = tensor.numel();
                 if (tensor.grad().defined()) {
                     assert(len == tensor.grad().numel());
-                    memcpy(ptr, tensor.grad().data_ptr<float>(), len * sizeof(float));
+                    memcpy(ptr, tensor.grad().to(at::kCPU).data_ptr<float>(), len * sizeof(float));
                 }
                 ptr += len;
             }
@@ -100,7 +100,7 @@ namespace angel {
             int64_t len = tensor.numel();
             if (tensor.grad().defined()) {
                 assert(len == tensor.grad().numel());
-                memcpy(ptr, tensor.grad().data_ptr<float>(), len * sizeof(float));
+                memcpy(ptr, tensor.grad().to(at::kCPU).data_ptr<float>(), len * sizeof(float));
             }
             ptr += len;
         }

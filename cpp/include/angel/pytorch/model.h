@@ -44,6 +44,7 @@ namespace angel {
     public:
         explicit TorchModel(const std::string &path) {
           module_ = torch::jit::load(path);
+          module_.to(at::kCUDA);
         }
 
         void train() {
@@ -76,14 +77,14 @@ namespace angel {
             std::vector<torch::jit::IValue> backward_inputs;
             backward_inputs.emplace_back(outputs.toTensor());
             if (targets.defined())
-              backward_inputs.emplace_back(targets);
+              backward_inputs.emplace_back(targets.to(at::kCUDA));
             auto loss = module_.get_method("loss")(backward_inputs).toTensor();
             loss.backward();
             return loss.item().toFloat();
           } else if (outputs.isTuple()) {
             auto elements = outputs.toTuple()->elements();
             if (targets.defined())
-              elements.emplace_back(targets);
+              elements.emplace_back(targets.to(at::kCUDA));
             auto loss = module_.get_method("loss")(elements).toTensor();
             loss.backward();
             return loss.item().toFloat();

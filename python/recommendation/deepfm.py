@@ -55,7 +55,7 @@ class DeepFM(torch.nn.Module):
         # type: (int, Tensor, Tensor, Tensor, Tensor) -> Tensor
         size = batch_size
         srcs = weights.view(1, -1).mul(values.view(1, -1)).view(-1)
-        output = torch.zeros(size, dtype=torch.float32)
+        output = torch.zeros(size, dtype=torch.float32, device="cuda")
         output.scatter_add_(0, index, srcs)
         first = output + bias
         return first
@@ -68,7 +68,7 @@ class DeepFM(torch.nn.Module):
         # t1: [k, n]
         t1 = embeddings.mul(values.view(-1, 1)).transpose_(0, 1)
         # t1: [k, b]
-        t1_ = torch.zeros(k, b, dtype=torch.float32)
+        t1_ = torch.zeros(k, b, dtype=torch.float32, device="cuda")
 
         index = index.repeat(k).view(k, -1)
         t1_.scatter_add_(1, index, t1)
@@ -79,7 +79,7 @@ class DeepFM(torch.nn.Module):
         # t2: [k, n]
         t2 = embeddings.pow(2).mul(values.pow(2).view(-1, 1)).transpose_(0, 1)
         # t2: [k, b]
-        t2_ = torch.zeros(k, b, dtype=torch.float32)
+        t2_ = torch.zeros(k, b, dtype=torch.float32, device="cuda")
         t2_.scatter_add_(1, index, t2)
 
         # t2: [k, b]

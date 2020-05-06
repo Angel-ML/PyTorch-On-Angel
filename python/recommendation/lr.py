@@ -44,7 +44,7 @@ class LogisticRegression(torch.nn.Module):
         index = index.view(-1)
         values = values.view(1, -1)
         srcs = weight.view(1, -1).mul(values).view(-1)
-        output = torch.zeros(batch_size, dtype=torch.float32)
+        output = torch.zeros(batch_size, dtype=torch.float32, device="cuda")
         output.scatter_add_(0, index, srcs)
         output = output + bias
         return torch.sigmoid(output)
