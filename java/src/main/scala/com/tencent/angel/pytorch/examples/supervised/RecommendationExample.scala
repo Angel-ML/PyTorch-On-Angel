@@ -43,6 +43,7 @@ object RecommendationExample {
     val numEpoch = params.getOrElse("numEpoch", "10").toInt
     val decay = params.getOrElse("decay", "0.001").toDouble
     val async = params.getOrElse("async", "true").toBoolean
+    val numDataPartitions = params.getOrElse("numDataPartitions", "100").toInt
     val angelModelOutputPath = params.getOrElse("angelModelOutputPath", "")
     val angelModelInputPath = params.getOrElse("angelModelInputPath", "")
     val torchOutputModelPath = params.getOrElse("torchOutputModelPath", "")
@@ -61,18 +62,22 @@ object RecommendationExample {
     recommendation.setEvaluations(evals)
     recommendation.setStorageLevel(StorageLevel.fromString(level))
 
-    val numPartitions = start(mode)
+    var numPartitions = start(mode)
+    if (numDataPartitions > numPartitions)
+      numPartitions = numDataPartitions
+    println(s"numDataPartitions=$numPartitions")
 
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
-    val trainInput = IOFunctions.loadString(trainPath).repartition(numPartitions) // training should be libsvm/libffm format
+    // training should be libsvm/libffm format
+    val trainInput = IOFunctions.loadString(trainPath).repartition(numPartitions)
 
     println(torch)
     val optim = recommendation.getOptimizer
     println(s"optimizer: $optim")
 
     if (actionType == "train") {
-      val model = RecommendPSModel.apply(torch, optim.getNumSlots(), rowType, angelModelInputPath)
+      val model = RecommendPSModel.apply(torch, optim.getNumSlots, rowType, angelModelInputPath)
       if (validatePath.length > 0) {
         val validateInput = IOFunctions.loadString(validatePath).repartition(numPartitions)
         recommendation.fit(model, trainInput, validateInput, optim)
@@ -87,7 +92,7 @@ object RecommendationExample {
     } else if (actionType == "predict") {
       // model load
       assert(angelModelInputPath.length > 0 && predictOutputPath.length > 0)
-      val model = RecommendPSModel.apply(torch, optim.getNumSlots(), rowType, angelModelInputPath)
+      val model = RecommendPSModel.apply(torch, optim.getNumSlots, rowType, angelModelInputPath)
       val results = recommendation.predict(model, trainInput)
       GraphIO.save(results, predictOutputPath)
     }

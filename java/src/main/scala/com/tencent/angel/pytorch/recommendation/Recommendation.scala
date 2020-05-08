@@ -165,7 +165,7 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     makeBiasGrad(biasInput, bias)
     makeWeightGrad(weightInput, weight, batch.getColIndices)
     model.updateBiasWeight(bias, weight, optim, useAsync)
-    (loss * batchSize)
+    loss * batchSize
   }
 
   def optimizeBiasWeightEmbedding(torch: TorchModel,
@@ -184,7 +184,7 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     makeWeightGrad(weightInput, weight, batch.getColIndices)
     makeEmbeddingGrad(embeddingInput, embedding, batch.getColIndices, model.getEmbeddingDim)
     model.updateBiasWeightEmbedding(bias, weight, embedding, optim, useAsync)
-    (loss * batchSize)
+    loss * batchSize
   }
 
   def optimizeBiasWeightEmbeddingMats(torch: TorchModel,

@@ -101,7 +101,7 @@ object MakeUtils {
 
   def makeMats(mats: Vector): Array[Float] = makeMats(mats.asInstanceOf[IntFloatVector])
 
-  def makeBiasGrad(grad: Array[Float], bias: IntFloatVector) =
+  def makeBiasGrad(grad: Array[Float], bias: IntFloatVector): Unit =
     bias.set(0, grad(0))
 
   def makeBiasGrad(grad: Array[Float], bias: Vector): Unit =

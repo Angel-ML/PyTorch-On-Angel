@@ -18,5 +18,19 @@ package com.tencent.angel.pytorch.eval
 import org.apache.spark.rdd.RDD
 
 class Precision extends Evaluation {
-  override def calculate(pairs: RDD[(Double, Double)]): Double = ???
+  override def calculate(pairs: RDD[(Double, Double)]): Double = {
+    pairs.cache()
+    val classNum = pairs.groupBy(f => f._1).count().toInt
+    if (classNum == 2) {
+      val tp = pairs.filter(f => f._1 == f._2 && f._1 == 1).count()
+      val fp = pairs.filter(f => f._1 == 0 && f._2 == 1).count()
+      tp * 1.0 / (tp + fp)
+    } else {
+      (0 until classNum).map { i =>
+        val tp = pairs.filter(f => f._1 == f._2 && f._1 == i).count()
+        val fp = pairs.filter(f => f._1 != i && f._2 == i).count()
+        tp * 1.0 / (tp + fp)
+      }.sum / classNum
+    }
+  }
 }

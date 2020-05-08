@@ -25,10 +25,10 @@ import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 class AsyncMomentum(eta: Double, decay: Double, momentum: Double = 0.9)
   extends AsyncOptim(eta, decay) {
 
-  override def getNumSlots(): Int = 2
+  override def getNumSlots: Int = 2
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam =
-    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, momentum), Array(offset, getNumSlots()))
+    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, momentum), Array(offset, getNumSlots))
 
   override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
     grad.setRowId(vector.id)

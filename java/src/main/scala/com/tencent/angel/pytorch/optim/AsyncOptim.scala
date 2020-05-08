@@ -26,15 +26,15 @@ abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
 
   protected var numSteps: Int = 1
 
-  def update(vector: PSVector, offset: Int, grad: Vector) = {
+  def update(vector: PSVector, offset: Int, grad: Vector): VoidResult = {
     asyncUpdate(vector, offset, grad).get
   }
 
-  def update(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]) = {
+  def update(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): VoidResult = {
     asyncUpdate(matrix, offset, rowIds, grads).get
   }
 
-  def update(matrix: PSMatrix, offset: Int, grads: Array[Vector]) = {
+  def update(matrix: PSMatrix, offset: Int, grads: Array[Vector]): VoidResult = {
     asyncUpdate(matrix, offset, grads).get
   }
 
@@ -44,7 +44,7 @@ abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
 
   def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult]
 
-  def getNumSlots(): Int
+  def getNumSlots: Int
 
   def step(num: Int): Unit = numSteps += num
 

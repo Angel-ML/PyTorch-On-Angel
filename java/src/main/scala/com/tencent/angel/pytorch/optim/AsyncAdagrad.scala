@@ -24,10 +24,10 @@ import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
 class AsyncAdagrad(eta: Double, decay: Double, factor: Double = 0.9)
   extends AsyncOptim(eta, decay) {
-  override def getNumSlots(): Int = 2
+  override def getNumSlots: Int = 2
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam =
-    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, factor), Array(offset, getNumSlots()))
+    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, factor), Array(offset, getNumSlots))
 
   override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {
     grad.setRowId(vector.id)
@@ -43,7 +43,7 @@ class AsyncAdagrad(eta: Double, decay: Double, factor: Double = 0.9)
   }
 
   override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
-    asyncUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+    asyncUpdate(matrix, offset, grads.indices.toArray, grads)
   }
 
   override def toString: String = s"AsyncAdagrad ${super.toString}"

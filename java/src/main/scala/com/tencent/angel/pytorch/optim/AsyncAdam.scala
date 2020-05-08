@@ -26,11 +26,11 @@ import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 class AsyncAdam(eta: Double, decay: Double = 0.0, gamma: Double = 0.99, beta: Double = 0.9)
   extends AsyncOptim(eta, decay) {
 
-  override def getNumSlots(): Int = 3
+  override def getNumSlots: Int = 3
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam = {
     numSteps += 1
-    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, gamma, beta), Array(offset, getNumSlots(), numSteps))
+    new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, gamma, beta), Array(offset, getNumSlots, numSteps))
   }
 
   override def asyncUpdate(vector: PSVector, offset: Int, grad: Vector): Future[VoidResult] = {

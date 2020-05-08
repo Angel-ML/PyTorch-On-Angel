@@ -275,7 +275,7 @@ object GNNPSModel {
     if (useBalancePartition)
       LoadBalancePartitioner.partition(index, maxId, psNumPartition, graph, 0.5F)
 
-    val weights = new MatrixContext("weights", optim.getNumSlots(), weightSize)
+    val weights = new MatrixContext("weights", optim.getNumSlots, weightSize)
     weights.setRowType(RowType.T_FLOAT_DENSE)
     weights.setPartitionerClass(classOf[ColumnRangePartitioner])
 

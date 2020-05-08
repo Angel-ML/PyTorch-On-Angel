@@ -98,7 +98,7 @@ class RecommendPSModel(bias: PSVector,
     }
   }
 
-  def getBiasWeight(): (Vector, Vector) = (bias.pull(), weight.pull())
+  def getBiasWeight: (Vector, Vector) = (bias.pull(), weight.pull())
 
   def getBiasWeightEmbedding(batch: CooLongFloatMatrix, async: Boolean): (Vector, Vector, Array[Vector]) = {
     val indices = distinctIndices(batch)
@@ -109,7 +109,7 @@ class RecommendPSModel(bias: PSVector,
       (bias.pull(), weight.pull(indices), getEmbedding(indices))
   }
 
-  def getBiasWeightEmbedding(): (Vector, Vector, Array[Vector]) =
+  def getBiasWeightEmbedding: (Vector, Vector, Array[Vector]) =
     (bias.pull(), weight.pull(), embedding.get.pull((0 until embeddingDim).toArray))
 
 
@@ -122,8 +122,8 @@ class RecommendPSModel(bias: PSVector,
       (bias.pull(), weight.pull(indices), getEmbedding(indices), getMats)
   }
 
-  def getBiasWeightEmbeddingMats(): (Vector, Vector, Array[Vector], Vector) = {
-    val (bias, weight, embedding) = getBiasWeightEmbedding()
+  def getBiasWeightEmbeddingMats: (Vector, Vector, Array[Vector], Vector) = {
+    val (bias, weight, embedding) = getBiasWeightEmbedding
     (bias, weight, embedding, getMats)
   }
 
@@ -281,14 +281,14 @@ class RecommendPSModel(bias: PSVector,
     val localPath = torch.name() + "-model.pt"
 
     def saveBiasWeight(path: String): Unit = {
-      val (bias, weight) = getBiasWeight()
+      val (bias, weight) = getBiasWeight
       val biasInput = makeBias(bias)
       val weightInput = makeWeight(weight)
       torch.save(biasInput, weightInput, path)
     }
 
     def saveBiasWeightEmbedding(path: String): Unit = {
-      val (bias, weight, embedding) = getBiasWeightEmbedding()
+      val (bias, weight, embedding) = getBiasWeightEmbedding
       val biasInput = makeBias(bias)
       val weightInput = makeWeight(weight)
       val embeddingInput = makeEmbedding(embedding)
@@ -296,7 +296,7 @@ class RecommendPSModel(bias: PSVector,
     }
 
     def saveBiasWeightEmbeddingMats(path: String): Unit = {
-      val (bias, weight, embedding) = getBiasWeightEmbedding()
+      val (bias, weight, embedding) = getBiasWeightEmbedding
       val mats = getMats
       val biasInput = makeBias(bias)
       val weightInput = makeWeight(weight)
