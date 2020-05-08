@@ -136,9 +136,6 @@ class GNN(val uid: String) extends Serializable
 
     val end = System.currentTimeMillis()
     println(s"initialize cost ${(end - start) / 1000}s")
-    val startTs = System.currentTimeMillis()
-    model.checkpointMatrices(0)
-    println(s"Write checkpoint use time=${System.currentTimeMillis() - startTs}ms")
     (model, graph)
   }
 
