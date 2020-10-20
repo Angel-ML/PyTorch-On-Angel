@@ -21,7 +21,7 @@ import com.tencent.angel.pytorch.recommendation.{RecommendPSModel, Recommendatio
 import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
-import com.tencent.angel.spark.ml.graph.utils.GraphIO
+import com.tencent.angel.graph.utils.GraphIO
 import com.tencent.angel.spark.ml.util.SparkUtils
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}

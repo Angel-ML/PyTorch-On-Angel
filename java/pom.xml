@@ -6,7 +6,7 @@
 
   <groupId>com.tencent.angel</groupId>
   <artifactId>pytorch-on-angel</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -26,13 +26,19 @@
     <dependency>
       <groupId>com.tencent.angel</groupId>
       <artifactId>spark-on-angel-mllib</artifactId>
-      <version>2.4.0</version>
+      <version>3.1.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tencent.angel</groupId>
+      <artifactId>spark-on-angel-graph</artifactId>
+      <version>3.1.0</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.tencent.angel</groupId>
       <artifactId>angel-ps-graph</artifactId>
-      <version>2.4.0</version>
+      <version>3.1.0</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

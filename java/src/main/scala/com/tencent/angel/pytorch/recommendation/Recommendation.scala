@@ -24,7 +24,7 @@ import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.params._
 import com.tencent.angel.pytorch.recommendation.MakeUtils._
 import com.tencent.angel.pytorch.torch.TorchModel
-import com.tencent.angel.spark.ml.graph.params.{HasBatchSize, HasStorageLevel}
+import com.tencent.angel.graph.utils.params.{HasBatchSize, HasStorageLevel}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.util.Identifiable

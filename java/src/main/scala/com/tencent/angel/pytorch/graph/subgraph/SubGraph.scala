@@ -19,7 +19,7 @@ package com.tencent.angel.pytorch.graph.subgraph
 import com.tencent.angel.pytorch.io.DataLoaderUtils
 import com.tencent.angel.pytorch.params.{HasInputFeaturePath, HasLabelPath, HasOutputFeaturePath}
 import com.tencent.angel.spark.context.PSContext
-import com.tencent.angel.spark.ml.graph.params._
+import com.tencent.angel.graph.utils.params._
 import org.apache.spark.SparkContext
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.{IntParam, ParamMap}

@@ -36,7 +36,7 @@ import com.tencent.angel.ps.storage.partitioner.ColumnRangePartitioner
 import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.partition.LoadBalancePartitioner
-import com.tencent.angel.spark.ml.psf.gcn.{GetLabels, GetLabelsResult}
+import com.tencent.angel.graph.psf.gcn.{GetLabels, GetLabelsResult}
 import com.tencent.angel.spark.models.impl.{PSMatrixImpl, PSVectorImpl}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 import com.tencent.angel.spark.util.VectorUtils
