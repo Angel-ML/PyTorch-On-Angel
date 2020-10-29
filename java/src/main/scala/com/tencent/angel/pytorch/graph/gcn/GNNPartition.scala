@@ -88,7 +88,7 @@ class GNNPartition(index: Int,
 
     val keyIterator = new Iterator[Array[(Long, String)]] with Serializable {
       override def hasNext: Boolean = {
-        if (!batchIterator.hasNext) TorchModel.put(torch)
+        if (!batchIterator.hasNext && !parseAloneNodes) TorchModel.put(torch)
         batchIterator.hasNext
       }
 
@@ -104,7 +104,10 @@ class GNNPartition(index: Int,
       val aloneNodes = model.getNodesWithOutDegree(index, numPartitions)
       val aloneBatchIterator = aloneNodes.sliding(batchSize, batchSize)
       val aloneIterator = new Iterator[Array[(Long, String)]] with Serializable {
-        override def hasNext: Boolean = aloneBatchIterator.hasNext
+        override def hasNext: Boolean = {
+          if (!aloneBatchIterator.hasNext) TorchModel.put(torch)
+          aloneBatchIterator.hasNext
+        }
 
 
         override def next: Array[(Long, String)] = {
