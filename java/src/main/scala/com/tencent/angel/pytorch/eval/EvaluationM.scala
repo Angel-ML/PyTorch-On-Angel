@@ -17,30 +17,27 @@
 package com.tencent.angel.pytorch.eval
 
 import org.apache.spark.rdd.RDD
+
 import scala.language.implicitConversions
 
+// evaluation for multi-labels
 private[pytorch]
-abstract class Evaluation {
+abstract class EvaluationM extends Serializable {
 
-  def calculate(pairs: RDD[(Double, Double)]): Double
+  def calculate(pairs: RDD[(Double, Double)]): String
 }
 
 private[pytorch]
-object Evaluation {
+object EvaluationM {
 
-  def eval(metrics: Array[String], pairs: RDD[(Double, Double)]): Map[String, Double] = {
-    metrics.map(name => (name.toLowerCase(), Evaluation.apply(name).calculate(pairs))).toMap
+  def eval(metrics: Array[String], pairs: RDD[(Double, Double)], numLabels: Int = 1): Map[String, String] = {
+    metrics.map(name => (name.toLowerCase(), EvaluationM.apply(name, numLabels).calculate(pairs))).toMap
   }
 
-  def apply(name: String): Evaluation = {
+  def apply(name: String, numLabels: Int = 1): EvaluationM = {
     name.toLowerCase match {
-      case "auc" => new AUC()
-      case "acc" => new Accuracy()
-      case "binary_acc" => new BinaryAccuracy()
-      case "precision" => new Precision()
-      case "recall" => new Recall()
-      case "F1Score" | "f1score" | "f1" => new F1Score()
-      case "rmse" => new RMSE()
+      case "multi_auc" => new MultiLabelAUC(numLabels)
+      case "multi_auc_collect" => new MultiLabelAUCCollect(numLabels)
     }
   }
 
@@ -48,5 +45,4 @@ object Evaluation {
   : RDD[(Double, Double)] = {
     rdd.map(x => (num.toDouble(x._1), num.toDouble(x._2)))
   }
-
 }
