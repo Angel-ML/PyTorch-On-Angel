@@ -14,6 +14,7 @@
  * the License.
  *
  */
+
 package com.tencent.angel.pytorch;
 
 import java.util.Map;
@@ -36,15 +37,31 @@ public class Torch {
 
   public static native int getInputDim(long ptr);
 
+  public static native int getUserInputDim(long ptr);
+
+  public static native int getItemInputDim(long ptr);
+
   public static native long[] getInputSizes(long ptr);
 
   public static native int getNumFields(long ptr);
 
+  public static native int getUserNumFields(long ptr);
+
+  public static native int getItemNumFields(long ptr);
+
   public static native int getEmbeddingDim(long ptr);
+
+  public static native int getUserEmbeddingDim(long ptr);
+
+  public static native int getItemEmbeddingDim(long ptr);
 
   public static native int[] getEmbeddingsSize(long ptr);
 
   public static native int getParametersTotalSize(long ptr);
+
+  public static native int[] getDenseColNums(long ptr);
+
+  public static native int[] getSparseColNums(long ptr);
 
   /* forward */
   public static native float[] forward(long ptr, Map<String, Object> params, boolean serving);
@@ -55,11 +72,15 @@ public class Torch {
   /* save module */
   public static native void save(long ptr, Map<String, Object> params);
 
+  public static native float[] dssmForward(long ptr, Map<String, Object> params);
+
+  public static native float dssmBackward(long ptr, Map<String, Object> params);
+
   /* word2vec backward */
   public static native float word2vecBackward(long ptr, Map<String, Object> params);
 
   /* graph backward */
-  public static native float gcnBackward(long ptr, Map<String, Object> params);
+  public static native float gcnBackward(long ptr, Map<String, Object> params, boolean sparse);
 
   /* graph exec */
   public static native Object gcnExecMethod(long ptr, String method, Map<String, Object> params);
@@ -67,9 +88,15 @@ public class Torch {
   /* graph get all parameters */
   public static native float[] getParameters(long ptr);
 
+  /* recommendation get dense mats parameters */
+  public static native float[] getMatsParameters(long ptr);
+
   /* set parameters to torch */
   public static native void setParameters(long ptr, float[] values);
 
   public static native void gcnSave(long ptr, Map<String, Object> params);
+
+  /* feature importance */
+  public static native float[] importance(long ptr, Map<String, Object> params);
 
 }
