@@ -81,10 +81,42 @@ JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsSize
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getDenseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getDenseColNums
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getSparseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getSparseColNums
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getInputDim
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getInputDim
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserInputDim
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemInputDim
         (JNIEnv *, jclass, jlong);
 
 /*
@@ -101,6 +133,22 @@ JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_getInputSizes
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserNumFields
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemNumFields
         (JNIEnv *, jclass, jlong);
 
 /*
@@ -109,6 +157,22 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingDim
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserEmbeddingDim
+        (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemEmbeddingDim
         (JNIEnv *, jclass, jlong);
 
 /*
@@ -134,6 +198,14 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getParametersTotalSi
  */
 JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
         (JNIEnv *, jclass, jlong, jobject, jboolean);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    importance
+ * Signature: (JLjava/util/Map;Z)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_importance
+        (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -165,7 +237,7 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_word2vecBackward
  * Signature: (JLjava/util/Map;)F
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
-        (JNIEnv *, jclass, jlong, jobject);
+  (JNIEnv *, jclass, jlong, jobject, jboolean);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -206,6 +278,22 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_setParameters
  */
 JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_gcnSave
 (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    dssmForward
+ * Signature: (JLjava/util/Map;)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_dssmForward
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    dssmBackward
+ * Signature: (JLjava/util/Map;)F
+ */
+JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_dssmBackward
+  (JNIEnv *, jclass, jlong, jobject);
 
 #ifdef __cplusplus
 }

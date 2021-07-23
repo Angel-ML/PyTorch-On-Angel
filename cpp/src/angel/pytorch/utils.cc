@@ -47,7 +47,7 @@ namespace angel {
       int start = 0;
       for (int i = 0; i < n_size; i += 2) {
         int len = size_iptr[i] * size_iptr[i + 1];
-        env->SetFloatArrayRegion(jmats, start, len, tensors[i / 2].data_ptr<float>());
+        env->SetFloatArrayRegion(jmats, start, len, tensors[i / 2].data<float>());
         start += len;
       }
     }
@@ -185,6 +185,35 @@ namespace angel {
       env->ReleasePrimitiveArrayCritical(inputs_size_array, p_insize, 0);
     }
 
+    // self defined add inputs for dssm
+    void add_input_dssm(JNIEnv* env,
+                        std::vector<torch::jit::IValue>* inputs,
+                        std::vector<std::pair<std::string, void*>> *ptrs,
+                        jobject params,
+                        const torch::TensorOptions& option,
+                        const std::string& data_key,
+                        const std::string& size_key) {
+      auto data_array = (jarray) angel::jni_map_get(env, params, data_key);
+      auto size_array = (jarray) angel::jni_map_get(env, params, size_key);
+      jboolean is_copy;
+      void* p_data = env->GetPrimitiveArrayCritical(data_array, &is_copy);
+      auto* p_fdata = reinterpret_cast<float*>(p_data);
+      void* p_size = env->GetPrimitiveArrayCritical(size_array, &is_copy);
+      auto* p_isize = reinterpret_cast<int*>(p_size);
+      int n_size = env->GetArrayLength(size_array);
+
+      std::vector<at::Tensor> tensors;
+      for (int i = 0; i < n_size; i += 1) {
+        auto t = torch::from_blob(p_fdata, {p_isize[i]}, option);
+        tensors.push_back(t);
+        p_fdata += p_isize[i];
+      }
+
+      inputs->emplace_back(tensors);
+      ptrs->push_back(std::make_pair(data_key, p_data));
+      env->ReleasePrimitiveArrayCritical(size_array, p_size, 0);
+    }
+
     void release_array(JNIEnv *env,
                        const std::vector<std::pair<std::string, void*>>& ptrs,
                        jobject params) {
@@ -202,33 +231,37 @@ namespace angel {
                    std::vector<torch::jit::IValue> &inputs,
                    std::vector<std::pair<std::string, void*>> &ptrs,
                    jobject params) {
-      assert(inputs.size() == ptrs.size());
+      // assert(inputs.size() == ptrs.size());
       size_t size = inputs.size();
       for (size_t i = 0; i < size; i++) {
         if (inputs[i].isTensor() && inputs[i].toTensor().grad().defined()) {
           auto array = (jarray) jni_map_get(env, params, ptrs[i].first);
           env->SetFloatArrayRegion((jfloatArray) array, 0, env->GetArrayLength(array),
-                                   inputs[i].toTensor().grad().data_ptr<float>());
+            inputs[i].toTensor().grad().data<float>());
         } else if (inputs[i].isTensorList()) {
           auto list = inputs[i].toTensorList();
+          if (list.get(0).grad().defined()) {
           auto array = jni_map_get(env, params, ptrs[i].first);
           if(env->IsInstanceOf(array, env->FindClass("[F"))) {
             int start = 0;
             for (size_t pos = 0; pos < list.size(); pos++) {
               int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-              env->SetFloatArrayRegion((jfloatArray)array, start, len, list.get(pos).grad().data_ptr<float>());
+              env->SetFloatArrayRegion((jfloatArray)array, start, len, list.get(pos).grad().data<float>());
               start += len;
             }
           } else {
             for (size_t pos = 0; pos < list.size(); pos++) {
               auto embedding_array = (jfloatArray)env->GetObjectArrayElement((jobjectArray)array, (jsize)pos);
               int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-              env->SetFloatArrayRegion(embedding_array, 0, len, list.get(pos).grad().data_ptr<float>());
+              env->SetFloatArrayRegion(embedding_array, 0, len, list.get(pos).grad().data<float>());
               env->SetObjectArrayElement((jobjectArray)array, (jsize)pos, embedding_array);
             }
             break;
           }
         }
+
       }
     }
+}
+
 } // namespace angel

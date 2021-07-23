@@ -93,6 +93,15 @@ namespace angel {
                    const torch::TensorOptions &option,
                    const std::string &key);
 
+    // dssm add input
+    void add_input_dssm(JNIEnv* env,
+                        std::vector<torch::jit::IValue>* inputs,
+                        std::vector<std::pair<std::string, void*>> *ptrs,
+                        jobject params,
+                        const torch::TensorOptions& option,
+                        const std::string& data_key,
+                        const std::string& size_key);
+
     void release_array(JNIEnv *env,
                        const std::vector<std::pair<std::string, void*>> &ptrs,
                        jobject params);
