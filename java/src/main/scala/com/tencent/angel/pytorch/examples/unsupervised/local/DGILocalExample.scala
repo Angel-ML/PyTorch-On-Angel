@@ -14,18 +14,20 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.examples.unsupervised
+package com.tencent.angel.pytorch.examples.unsupervised.local
 
+import com.tencent.angel.conf.AngelConf
 import com.tencent.angel.pytorch.graph.gcn.DGI
 import com.tencent.angel.pytorch.io.IOFunctions
+import com.tencent.angel.pytorch.utils.PartitionUtils
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
-import com.tencent.angel.spark.ml.graph.utils.GraphIO
+import com.tencent.angel.graph.utils.GraphIO
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.language.existentials
 
-object DGIExample {
+object DGILocalExample {
 
   def main(args: Array[String]): Unit = {
     val params = ArgsUtil.parse(args)
@@ -33,13 +35,19 @@ object DGIExample {
     val featureInput = params.getOrElse("featurePath", "")
     val embeddingPath = params.getOrElse("embeddingPath", "")
     val outputModelPath = params.getOrElse("outputModelPath", "")
+    val featureEmbedInputPath = params.getOrElse("featureEmbedInputPath", "")
+    val fieldNum = params.getOrElse("fieldNum", "-1").toInt
+    val featEmbedDim = params.getOrElse("featEmbedDim", "-1").toInt
     val batchSize = params.getOrElse("batchSize", "100").toInt
-    val torchModelPath = params.getOrElse("upload_torchModelPath", "model.pt")
+    var torchModelPath = params.getOrElse("upload_torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
+    val decay = params.getOrElse("decay", "0.0").toDouble
     val featureDim = params.getOrElse("featureDim", "-1").toInt
     val optimizer = params.getOrElse("optimizer", "adam")
-    val psNumPartition = params.getOrElse("psNumPartition", "10").toInt
-    val numPartitions = params.getOrElse("numPartitions", "5").toInt
+    var psNumPartition = params.getOrElse("psNumPartition", "10").toInt
+    var numPartitions = params.getOrElse("numPartitions", "5").toInt
+    val psNumPartitionFactor = params.getOrElse("psNumPartitionFactor", "2").toInt
+    val numPartitionsFactor = params.getOrElse("numPartitionsFactor", "3").toInt
     val useBalancePartition = params.getOrElse("useBalancePartition", "false").toBoolean
     val numEpoch = params.getOrElse("numEpoch", "10").toInt
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
@@ -48,12 +56,21 @@ object DGIExample {
     val numSamples = params.getOrElse("samples", "5").toInt
     val numBatchInit = params.getOrElse("numBatchInit", "5").toInt
     val actionType = params.getOrElse("actionType", "train")
+    val saveCheckpoint = params.getOrElse("saveCheckpoint", "false").toBoolean
+    val periods = params.getOrElse("periods", "1000").toInt
+    val isWeighted = params.getOrElse("isWeighted", "false").toBoolean
+    val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
+    val sep = params.getOrElse("sep", "space") match {
+      case "space" => " "
+      case "comma" => ","
+      case "tab" => "\t"
+    }
 
-    val conf = new SparkConf()
-    conf.set("spark.executorEnv.OMP_NUM_THREADS", "2")
-    conf.set("spark.executorEnv.MKL_NUM_THREADS", "2")
+    val conf = start()
 
-    val sc = new SparkContext(conf)
+    numPartitions = PartitionUtils.getDataPartitionNum(numPartitions, conf, numPartitionsFactor)
+    psNumPartition = PartitionUtils.getPsPartitionNum(psNumPartition, conf, psNumPartitionFactor)
+    println(s"numPartition: $numPartitions, numPsPartition: $psNumPartition")
 
     val dgi = new DGI()
     dgi.setTorchModelPath(torchModelPath)
@@ -70,25 +87,50 @@ object DGIExample {
     dgi.setDataFormat(format)
     dgi.setNumBatchInit(numBatchInit)
     dgi.setNumSamples(numSamples)
+    dgi.setSaveCheckpoint(saveCheckpoint)
+    dgi.setPeriods(periods)
+    dgi.setHasWeighted(isWeighted)
+    dgi.setDecay(decay)
+    dgi.setBatchSizeMultiple(batchSizeMultiple)
+    dgi.setFeatEmbedPath(featureEmbedInputPath)
+    dgi.setFeatEmbedDim(featEmbedDim)
+    dgi.setFieldNum(fieldNum)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
 
     val (model, graph) = dgi.initialize(edges, features)
-    dgi.showSummary(model, graph)
-
-    if (actionType == "train")
-      dgi.fit(model, graph)
+    dgi.fit(model, graph)
 
     if (embeddingPath.length > 0) {
       val embedding = dgi.genEmbedding(model, graph)
       GraphIO.save(embedding, embeddingPath, seq = " ")
     }
 
-    if (actionType == "train" && outputModelPath.length > 0)
+    if (actionType == "train" && outputModelPath.length > 0) {
       dgi.save(model, outputModelPath)
-
-    PSContext.stop()
-    sc.stop()
+      if (fieldNum > 0) {
+        dgi.saveFeatEmbed(model, outputModelPath)
+      }
+    }
+    stop()
   }
+
+
+  def start(mode: String = "local"): SparkConf = {
+    val conf = new SparkConf()
+    conf.setMaster(mode)
+    conf.setAppName("DGILocalExample")
+    conf.set(AngelConf.ANGEL_PSAGENT_UPDATE_SPLIT_ADAPTION_ENABLE, "false")
+    val sc = new SparkContext(conf)
+    sc.setLogLevel("ERROR")
+    sc.setCheckpointDir("cp")
+    conf
+  }
+
+  def stop(): Unit = {
+    PSContext.stop()
+    SparkContext.getOrCreate().stop()
+  }
+
 }
