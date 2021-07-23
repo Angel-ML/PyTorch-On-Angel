@@ -214,6 +214,34 @@ JNIEXPORT jlongArray JNICALL Java_com_tencent_angel_pytorch_Torch_getInputSizes
     return output_ptr_jarray;
 }
 
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getDenseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getDenseColNums
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  auto output = ptr->get_dense_col_nums();
+  auto output_ptr = output.data();
+  DEFINE_JINTARRAY(output_ptr, static_cast<jsize>(output.size()));
+  return output_ptr_jarray;
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getSparseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getSparseColNums
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  auto output = ptr->get_sparse_col_nums();
+  auto output_ptr = output.data();
+  DEFINE_JINTARRAY(output_ptr, static_cast<jsize>(output.size()));
+  return output_ptr_jarray;
+}
+
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -235,6 +263,11 @@ void add_inputs(JNIEnv *env,
     int len = env->GetArrayLength((jarray) angel::jni_map_get(env, jparams, "index"));
     size_t start_pos = inputs->size();
     switch (type) {
+        case angel::TorchModelType::EMBEDDINGS_MATS_FIELD:
+          add_input(env, inputs, ptrs, jparams, TORCH_OPTION_INT64, "fields");
+          add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
+          add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "embeddings_array", "embeddings_sizes", "inputs_sizes");
+          break;
         case angel::TorchModelType::EMBEDDINGS_MATS:
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "embeddings_array", "embeddings_sizes", len);
@@ -318,6 +351,7 @@ std::vector<std::pair<std::string, int>> add_parameters(JNIEnv *env,
         default:
             break;
     }
+
     return input_index;
 }
 
@@ -333,6 +367,11 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
     // build inputs
     std::vector<torch::jit::IValue> inputs;
     std::vector<std::pair<std::string, void *>> ptrs;
+
+    int multi_forward_out = 1;
+    if (angel::jni_map_contain(env, jparams, "multi_forward_out")) {
+      multi_forward_out = angel::jni_map_get_int(env, jparams, "multi_forward_out");
+    }
 
     int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
     int training = 0;
@@ -363,7 +402,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
         add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
         auto output = ptr->forward(inputs).toTensor();
         auto output_ptr = output.data_ptr();
-        DEFINE_JFLOATARRAY(output_ptr, batch_size);
+      DEFINE_JFLOATARRAY(output_ptr, batch_size * multi_forward_out);
 
         // release java arrays
         release_array(env, ptrs, jparams);
@@ -436,6 +475,74 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_backward
     release_array(env, ptrs, jparams);
 
     return loss;
+}
+
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    dssmForward
+ * Signature: (JLjava/util/Map;)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_dssmForward
+    (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams) {
+using namespace angel;
+DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+// build inputs
+std::vector<torch::jit::IValue> inputs;
+std::vector<std::pair<std::string, void *>> ptrs;
+
+int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
+// data inputs
+inputs.emplace_back(batch_size);
+ptrs.emplace_back(std::make_pair("batch_size", nullptr)); // why adding a nullptr ?
+
+add_input_dssm(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "index", "inputs_sizes");
+add_input_dssm(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values", "inputs_sizes");
+add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "embeddings_array", "embeddings_sizes", "inputs_sizes");
+add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
+// parameters inputs
+
+auto output = ptr->forward(inputs).toTensor();
+auto output_ptr = output.data_ptr();
+DEFINE_JFLOATARRAY(output_ptr, batch_size);
+
+// release java arrays
+release_array(env, ptrs, jparams);
+return output_ptr_jarray;
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    dssmBackward
+ * Signature: (JLjava/util/Map;)F
+ */
+JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_dssmBackward
+    (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams) {
+using namespace angel;
+DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+// build inputs
+std::vector<torch::jit::IValue> inputs;
+std::vector<std::pair<std::string, void *>> ptrs;
+int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
+// data inputs
+inputs.emplace_back(batch_size);
+ptrs.emplace_back(std::make_pair("batch_size", nullptr));
+add_input_dssm(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "index", "inputs_sizes");
+add_input_dssm(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values", "inputs_sizes");
+add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "embeddings_array", "embeddings_sizes", "inputs_sizes");
+add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
+
+// targets
+jarray targets = (jarray) jni_map_get(env, jparams, "targets");
+jboolean is_copy;
+DEFINE_PRIMITIVE_ARRAY(targets);
+DEFINE_JARRAY_TENSOR_DIM_FLOAT(targets);
+
+auto loss = ptr->backward(inputs, targets_tensor);
+set_grads(env, inputs, ptrs, jparams);
+release_array(env, ptrs, jparams);
+RELEASE_PRIMITIVE_ARRAY(targets);
+return loss;
 }
 
 /*

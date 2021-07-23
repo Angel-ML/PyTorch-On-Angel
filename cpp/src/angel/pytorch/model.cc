@@ -25,24 +25,34 @@ namespace angel {
 
     int TorchModel::get_parameters_total_size() {
         int size = 0;
-        for (auto const &m: module_.get_modules())
-            for (auto const &p: m.get_parameters())
-                size += p.value().toTensor().numel();
-
-        for (auto const &it: module_.get_parameters())
-            size += it.value().toTensor().numel();
+    #ifdef LIBTORCH_VERSION_LATEST
+      //auto iter and get all the parameters in the module struct and sub-module struct
+      for (auto const &p: module_.parameters())
+        size += p.numel();
+    #else
+      for (auto const &t: this->get_parameters())
+        size += t.numel();
+    #endif
 
         return size;
     }
 
     std::vector<at::Tensor> TorchModel::get_parameters() {
         std::vector<at::Tensor> tensors;
-        for (auto const& m: module_.get_modules())
-            for (auto const &p: m.get_parameters())
-                tensors.push_back(p.value().toTensor().view({-1}));
-
-        for (auto const &it: module_.get_parameters())
-            tensors.push_back(it.value().toTensor().view({-1}));
+      #ifdef LIBTORCH_VERSION_LATEST
+        //auto iter and get all the parameters in the module struct and sub-module struct
+        for (auto const &p: module_.parameters())
+          tensors.push_back(p.view({-1}));
+      #else
+        //this may not work for multi-nested modules
+        // for (auto const &m: module_.get_modules())
+        //     for (auto const &p: m.get_parameters())
+        //       ...........
+        // for (auto const &it: module_.get_parameters())
+        //    ...........
+        //get all the tensors by a iter
+        geten_module_iters(module_, tensors);
+      #endif
 
         return tensors;
     }
@@ -57,73 +67,84 @@ namespace angel {
     }
 
     void TorchModel::set_gcn_parameters(void *data_ptr, int size) {
+      #ifdef LIBTORCH_VERSION_LATEST
         assert(size == get_parameters_total_size());
-        // sub modules
         auto *ptr = reinterpret_cast<float *>(data_ptr);
-        for (auto const &m : module_.get_modules()) {
-            for (auto const &p : m.get_parameters()) {
-                auto tensor = p.value().toTensor();
-                auto len = static_cast<size_t>(tensor.numel());
-                memcpy(tensor.data_ptr(), reinterpret_cast<void*>(ptr), len * sizeof(float));
+        for (auto const &p : module_.parameters()) {
+            auto len = static_cast<size_t>(p.numel());
+            memcpy(p.data_ptr<float>(), reinterpret_cast<void*>(ptr), len * sizeof(float));
                 ptr += len;
             }
+      #else
+        auto tensors = get_parameters();
+
+        int all_tensor_size = 0;
+        for(auto const &t : tensors){
+            all_tensor_size += t.numel();
         }
-        // parameter from this module
-        for (auto const &it: module_.get_parameters()) {
-            auto tensor = it.value().toTensor();
-            auto len = static_cast<size_t>(tensor.numel());
-            memcpy(tensor.data_ptr(), reinterpret_cast<void*>(ptr), len * sizeof(float));
+        assert(all_tensor_size == size);
+
+        auto *ptr = reinterpret_cast<float *>(data_ptr);
+        for (auto const &t : tensors){
+            auto len = static_cast<size_t>(t.numel());
+            memcpy(t.data_ptr<float>(), reinterpret_cast<void*>(ptr), len * sizeof(float));
             ptr += len;
         }
+    #endif
     }
 
     void TorchModel::set_gcn_gradients(void *data_ptr, int size) {
-        assert(size == get_parameters_total_size());
-        // clear grads
-        memset(data_ptr, 0, size * sizeof(float));
-        // sub modules
-        auto *ptr = reinterpret_cast<float*>(data_ptr);
-        for (auto const &m : module_.get_modules()) {
-            for (auto const &p : m.get_parameters()) {
-                auto tensor = p.value().toTensor();
-                int64_t len = tensor.numel();
-                if (tensor.grad().defined()) {
-                    assert(len == tensor.grad().numel());
-                    memcpy(ptr, tensor.grad().data_ptr<float>(), len * sizeof(float));
+    #ifdef LIBTORCH_VERSION_LATEST
+            assert(size == get_parameters_total_size());
+            // clear grads
+            memset(data_ptr, 0, size * sizeof(float));
+            auto *ptr = reinterpret_cast<float*>(data_ptr);
+            for (auto const &p : module_.parameters()) {
+                int64_t len = p.numel();
+                if (p.grad().defined()) {
+                    assert(len == p.grad().numel());
+                    memcpy(ptr, p.grad().data_ptr<float>(), len * sizeof(float));
                 }
                 ptr += len;
             }
-        }
-        // parameter from this module
-        for (auto const &it: module_.get_parameters()) {
-            auto tensor = it.value().toTensor();
-            int64_t len = tensor.numel();
-            if (tensor.grad().defined()) {
-                assert(len == tensor.grad().numel());
-                memcpy(ptr, tensor.grad().data_ptr<float>(), len * sizeof(float));
+          #else
+            auto tensors = get_parameters();
+
+            int all_tensor_size = 0;
+            for(auto const &t : tensors){
+                all_tensor_size += t.numel();
             }
+            assert(all_tensor_size == size);
+            memset(data_ptr, 0, size * sizeof(float));
+
+            auto *ptr = reinterpret_cast<float*>(data_ptr);
+            for (auto const &t : tensors){
+                int64_t len = static_cast<size_t>(t.numel());
+                if(t.grad().defined()){
+                    assert(len == t.grad().numel());
+                    memcpy(ptr, t.grad().data_ptr<float>(), len * sizeof(float));
+                }
             ptr += len;
         }
+    #endif
     }
 
     void TorchModel::zero_grad() {
-        for (auto const &m : module_.get_modules()) {
-            for (auto const &p : m.get_parameters()) {
-                auto tensor = p.value().toTensor();
-                if (tensor.grad().defined()) {
-                    tensor.grad().detach_();
-                    tensor.grad().zero_();
+          #ifdef LIBTORCH_VERSION_LATEST
+            for (auto const &p : module_.parameters()) {
+                if (p.grad().defined()) {
+                    p.grad().detach_();
+                    p.grad().zero_();
                 }
             }
-        }
-
-        for (auto const &it : module_.get_parameters()) {
-            auto tensor = it.value().toTensor();
-            if (tensor.grad().defined()) {
-                tensor.grad().detach_();
-                tensor.grad().zero_();
+          #else
+            for (auto const &t : this->get_parameters()){
+                if(t.grad().defined()){
+                    t.grad().detach_();
+                    t.grad().zero_();
+                }
             }
-        }
+          #endif
     }
 
     void TorchModel::set_parameter(const std::string &key, const torch::jit::IValue &value) {
