@@ -14,34 +14,42 @@
  * the License.
  *
  */
-package com.tencent.angel.pytorch.examples.supervised
+package com.tencent.angel.pytorch.examples.supervised.local
 
-import com.tencent.angel.pytorch.graph.gcn.GCN
+import com.tencent.angel.conf.AngelConf
+import com.tencent.angel.pytorch.graph.gcn.RGCN
 import com.tencent.angel.pytorch.io.IOFunctions
+import com.tencent.angel.pytorch.utils.PartitionUtils
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
-import com.tencent.angel.spark.ml.graph.utils.GraphIO
+import com.tencent.angel.graph.utils.GraphIO
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.language.existentials
 
-object GraphSageExample {
+object RGCNLocalExample {
 
   def main(args: Array[String]): Unit = {
     val params = ArgsUtil.parse(args)
+    val mode = params.getOrElse("mode", "yarn-cluster")
     val edgeInput = params.getOrElse("edgePath", "")
     val featureInput = params.getOrElse("featurePath", "")
     val labelPath = params.getOrElse("labelPath", "")
     val predictOutputPath = params.getOrElse("predictOutputPath", "")
     val embeddingPath = params.getOrElse("embeddingPath", "")
     val outputModelPath = params.getOrElse("outputModelPath", "")
+    val featureEmbedInputPath = params.getOrElse("featureEmbedInputPath", "")
+    val fieldNum = params.getOrElse("fieldNum", "-1").toInt
+    val featEmbedDim = params.getOrElse("featEmbedDim", "-1").toInt
     val batchSize = params.getOrElse("batchSize", "100").toInt
-    val torchModelPath = params.getOrElse("upload_torchModelPath", "model.pt")
+    var torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
     val featureDim = params.getOrElse("featureDim", "-1").toInt
     val optimizer = params.getOrElse("optimizer", "adam")
-    val psNumPartition = params.getOrElse("psNumPartition", "10").toInt
-    val numPartitions = params.getOrElse("numPartitions", "1").toInt
+    var psNumPartition = params.getOrElse("psNumPartition", "10").toInt
+    var numPartitions = params.getOrElse("numPartitions", "10").toInt
+    val psNumPartitionFactor = params.getOrElse("psNumPartitionFactor", "2").toInt
+    val numPartitionsFactor = params.getOrElse("numPartitionsFactor", "3").toInt
     val useBalancePartition = params.getOrElse("useBalancePartition", "false").toBoolean
     val numEpoch = params.getOrElse("numEpoch", "10").toInt
     val testRatio = params.getOrElse("testRatio", "0.5").toFloat
@@ -50,18 +58,27 @@ object GraphSageExample {
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
     val numBatchInit = params.getOrElse("numBatchInit", "5").toInt
     val actionType = params.getOrElse("actionType", "train")
-    val periods = params.getOrElse("periods", "1000").toInt
     val checkpointInterval = params.getOrElse("checkpointInterval", "0").toInt
-    val decay = params.getOrElse("decay", "0.001").toFloat
-    val evals = params.getOrElse("evals", "acc")
+    var evals = params.getOrElse("evals", "acc")
+    val useSecondOrder = params.getOrElse("second", "true").toBoolean
+    var useSharedSamples = params.getOrElse("useSharedSamples", "false").toBoolean
+    if (batchSize < 128) useSharedSamples = false
+    val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
+    val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
+    val sep = params.getOrElse("sep", "space") match {
+      case "space" => " "
+      case "comma" => ","
+      case "tab" => "\t"
+    }
 
-    val conf = new SparkConf()
-    conf.set("spark.executorEnv.OMP_NUM_THREADS", "2")
-    conf.set("spark.executorEnv.MKL_NUM_THREADS", "2")
+    if (numLabels > 1) evals = "multi_auc"
 
-    val sc = new SparkContext(conf)
+    val conf = start()
 
-    val gcn = new GCN()
+    numPartitions = PartitionUtils.getDataPartitionNum(numPartitions, conf, numPartitionsFactor)
+    println(s"numPartition: $numPartitions, numPsPartition: $psNumPartition")
+
+    val gcn = new RGCN()
     gcn.setTorchModelPath(torchModelPath)
     gcn.setFeatureDim(featureDim)
     gcn.setOptimizer(optimizer)
@@ -77,20 +94,24 @@ object GraphSageExample {
     gcn.setDataFormat(format)
     gcn.setNumSamples(numSamples)
     gcn.setNumBatchInit(numBatchInit)
-    gcn.setPeriods(periods)
     gcn.setCheckpointInterval(checkpointInterval)
-    gcn.setDecay(decay)
+    gcn.setUseSecondOrder(useSecondOrder)
+    gcn.setUseSharedSamples(useSharedSamples)
+    gcn.setNumLabels(numLabels)
     gcn.setEvaluations(evals)
+    gcn.setBatchSizeMultiple(batchSizeMultiple)
+    gcn.setFeatEmbedPath(featureEmbedInputPath)
+    gcn.setFeatEmbedDim(featEmbedDim)
+    gcn.setFieldNum(fieldNum)
 
-    val edges = GraphIO.load(edgeInput, isWeighted = false)
+    val edges = IOFunctions.loadEdge(edgeInput, isTyped = true)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
     val labels = IOFunctions.loadLabel(labelPath)
 
     val (model, graph) = gcn.initialize(edges, features, Option(labels))
-    gcn.showSummary(model, graph)
 
     if (actionType == "train")
-      gcn.fit(model, graph, outputModelPath)
+      gcn.fit(model, graph)
 
     if (predictOutputPath.length > 0) {
       val predict = gcn.genLabels(model, graph)
@@ -102,11 +123,31 @@ object GraphSageExample {
       GraphIO.save(embedding, embeddingPath, seq = " ")
     }
 
-    if (actionType == "train" && outputModelPath.length > 0)
+    if (actionType == "train" && outputModelPath.length > 0) {
       gcn.save(model, outputModelPath)
+      if (fieldNum > 0) {
+        gcn.saveFeatEmbed(model, outputModelPath)
+      }
+    }
 
+    stop()
+  }
+
+
+  def start(mode: String = "local"): SparkConf = {
+    val conf = new SparkConf()
+    conf.setMaster(mode)
+    conf.setAppName("r-gcn")
+    conf.set(AngelConf.ANGEL_PSAGENT_UPDATE_SPLIT_ADAPTION_ENABLE, "false")
+    val sc = new SparkContext(conf)
+    sc.setLogLevel("ERROR")
+    sc.setCheckpointDir("cp")
+    conf
+  }
+
+  def stop(): Unit = {
     PSContext.stop()
-    sc.stop()
+    SparkContext.getOrCreate().stop()
   }
 
 }
