@@ -296,24 +296,24 @@ std::vector<std::pair<std::string, int>> add_parameters(JNIEnv *env,
     std::vector<std::pair<std::string, int>> input_index;
     switch (type) {
         case angel::TorchModelType ::EMBEDDINGS_MATS:
-            input_index.emplace_back("mats", inputs->size());
+          input_index.push_back(std::make_pair("mats", inputs->size()));
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
-            input_index.emplace_back("embeddings", inputs->size());
+          input_index.push_back(std::make_pair("embeddings", inputs->size()));
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "embeddings_array", "embeddings_sizes", "inputs_sizes");
             break;
         case angel::TorchModelType::BIAS_WEIGHT_EMBEDDING_MATS:
         case angel::TorchModelType::BIAS_WEIGHT_EMBEDDING_MATS_FIELD:
-            input_index.emplace_back("mats", inputs->size());
+          input_index.push_back(std::make_pair("mats", inputs->size()));
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "mats", "mats_sizes");
         case angel::TorchModelType::BIAS_WEIGHT_EMBEDDING:
-            input_index.emplace_back("embedding", inputs->size());
+          input_index.push_back(std::make_pair("embedding", inputs->size()));
             add_input(env, inputs, ptrs, jparams,
                       {angel::jni_map_get_int(env, jparams, "dim"), angel::jni_map_get_int(env, jparams, "embedding_dim")},
                       TORCH_OPTION_FLOAT_GRAD, "embedding");
         case angel::TorchModelType::BIAS_WEIGHT:
-            input_index.emplace_back("weights", inputs->size());
+          input_index.push_back(std::make_pair("weights", inputs->size()));
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "weights");
-            input_index.emplace_back("bias", inputs->size());
+          input_index.push_back(std::make_pair("bias", inputs->size()));
             add_input(env, inputs, ptrs, jparams, TORCH_OPTION_FLOAT_GRAD, "bias");
         default:
             break;
@@ -335,11 +335,17 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
     std::vector<std::pair<std::string, void *>> ptrs;
 
     int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
+    int training = 0;
     // data inputs
     inputs.emplace_back(batch_size);
-    ptrs.emplace_back(std::make_pair("batch_size", nullptr));
+    inputs.emplace_back(training); // 0 represents predicting
+    ptrs.emplace_back(std::make_pair("batch_size", nullptr)); // why adding a nullptr ?
+    ptrs.emplace_back(std::make_pair("training", nullptr));
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "index");
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "feats");
+    add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values");
+
+    // targets, forward has no targets, add values instead to adjust the "forward_" function in pt
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values");
 
     if (serving) {
@@ -367,6 +373,39 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    forward
+ * Signature: (JLjava/util/Map;)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_importance
+    (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams) {
+    using namespace angel;
+    DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+    // build inputs
+    std::vector<torch::jit::IValue> inputs;
+    std::vector<std::pair<std::string, void *>> ptrs;
+
+    int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
+    // data inputs
+    inputs.emplace_back(batch_size);
+    ptrs.emplace_back(
+        std::make_pair("batch_size", nullptr)); // why adding a nullptr ?
+    add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "index");
+    add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "feats");
+    add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values");
+
+    add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
+    auto output = ptr->importance(inputs).toTensor();
+    auto output_ptr = output.data_ptr();
+    DEFINE_JFLOATARRAY(output_ptr, output.numel());
+
+    // release java arrays
+    release_array(env, ptrs, jparams);
+    return output_ptr_jarray;
+}
+
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    backward
  * Signature: (JLjava/util/Map;)F
  */
@@ -378,24 +417,24 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_backward
     std::vector<torch::jit::IValue> inputs;
     std::vector<std::pair<std::string, void *>> ptrs;
     int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
+    int training = 1;
     // data inputs
     inputs.emplace_back(batch_size);
+    inputs.emplace_back(training); // 1 represents training
     ptrs.emplace_back(std::make_pair("batch_size", nullptr));
+    ptrs.emplace_back(std::make_pair("training", nullptr));
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "index");
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_INT64, "feats");
     add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "values");
-    // parameters inputs
-    add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
     // targets
-    jarray targets = (jarray) jni_map_get(env, jparams, "targets");
-    jboolean is_copy;
-    DEFINE_PRIMITIVE_ARRAY(targets);
-    DEFINE_JARRAY_TENSOR_DIM_FLOAT(targets);
+    add_input(env, &inputs, &ptrs, jparams, TORCH_OPTION_FLOAT, "targets");
+    // parameters inputs
+    add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type()); // add fields by type
 
-    auto loss = ptr->backward(inputs, targets_tensor);
+    auto loss = ptr->recommend_backward(inputs);
     set_grads(env, inputs, ptrs, jparams);
     release_array(env, ptrs, jparams);
-    RELEASE_PRIMITIVE_ARRAY(targets);
+
     return loss;
 }
 
@@ -441,8 +480,9 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
     for (auto& pair: input_index) {
         ptr->set_parameter(pair.first, parameters[pair.second]);
     }
+  //  ptr->save_module(parameters, ptr->get_type());
     jstring jpath = (jstring) jni_map_get(env, jparams, "path");
-    const char* path = env->GetStringUTFChars(jpath, nullptr);
+    const char* path = env->GetStringUTFChars(jpath, 0);
     ptr->save(path);
     release_array(env, ptrs, jparams);
 }
