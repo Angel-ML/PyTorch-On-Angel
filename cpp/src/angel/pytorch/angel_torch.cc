@@ -100,6 +100,28 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getInputDim
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserInputDim
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_user_input_dim());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemInputDim
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_item_input_dim());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getNumFields
  * Signature: (J)I
  */
@@ -450,6 +472,48 @@ void gcn_add_parameters(JNIEnv *env,
         }
     }
 
+    // add bipartite u and i
+    if (jni_map_contain(env, jparams, "user_feature_dim")) {
+      int user_feature_dim = jni_map_get_int(env, jparams, "user_feature_dim");
+      const std::vector<std::string> u_keys = {"u", "pos_u", "neg_u"};
+      for (auto u_key: u_keys){
+          if (jni_map_contain(env, jparams, u_key)) {
+              jarray u = (jarray) jni_map_get(env, jparams, u_key);
+              int u_num = env->GetArrayLength(u) / user_feature_dim;
+              add_input(env, inputs, ptrs, jparams, {u_num, user_feature_dim}, TORCH_OPTION_FLOAT, u_key);
+          }
+      }
+    }
+    if (jni_map_contain(env, jparams, "item_feature_dim")) {
+      int item_feature_dim = jni_map_get_int(env, jparams, "item_feature_dim");
+      const std::vector<std::string> i_keys = {"i", "pos_i", "neg_i"};
+      for (auto i_key: i_keys){
+          if (jni_map_contain(env, jparams, i_key)) {
+              jarray i = (jarray) jni_map_get(env, jparams, i_key);
+              int i_num = env->GetArrayLength(i) / item_feature_dim;
+              add_input(env, inputs, ptrs, jparams, {i_num, item_feature_dim}, TORCH_OPTION_FLOAT, i_key);
+          }
+      }
+    }
+
+    // add bipartite edge_index
+    const std::vector<std::string> bi_edge_keys = {"u_edge_index", "first_u_edge_index", "second_u_edge_index", "i_edge_index", "first_i_edge_index", "second_i_edge_index"};
+    for (auto bi_edge_key: bi_edge_keys){
+      if (jni_map_contain(env, jparams, bi_edge_key)) {
+          jarray bi_edge_index = (jarray) jni_map_get(env, jparams, bi_edge_key);
+          int bi_edge_num = env->GetArrayLength(bi_edge_index) / 2;
+          add_input(env, inputs, ptrs, jparams, {2, bi_edge_num}, TORCH_OPTION_INT64, bi_edge_key);
+      }
+    }
+
+    const std::vector<std::string> bi_item_type_keys = {"edge_type", "first_u_edge_type", "first_i_edge_type", "second_u_edge_type", "first_u_edge_i_type", "second_u_edge_i_type"};
+    for (auto bi_item_type_key: bi_item_type_keys){
+        if (jni_map_contain(env, jparams, bi_item_type_key)) {
+            jarray bi_item_type_index = (jarray) jni_map_get(env, jparams, bi_item_type_key);
+            int bi_edge_num = env->GetArrayLength(bi_item_type_index);
+            add_input(env, inputs, ptrs, jparams, {1, bi_edge_num}, TORCH_OPTION_INT32, bi_item_type_key);
+        }
+    }
 
 }
 
