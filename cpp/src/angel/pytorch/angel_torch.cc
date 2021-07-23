@@ -133,6 +133,28 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserNumFields
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_user_num_fields());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemNumFields
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_item_num_fields());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getEmbeddingDim
  * Signature: (J)I
  */
@@ -140,6 +162,28 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingDim
         (JNIEnv *env, jclass jcls, jlong jptr) {
     DEFINE_MODEL_PTR(angel::TorchModel, jptr);
     return static_cast<jint>(ptr->get_embedding_dim());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserEmbeddingDim
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_user_embedding_dim());
+}
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemEmbeddingDim
+  (JNIEnv *env, jclass jcls, jlong jptr) {
+  DEFINE_MODEL_PTR(angel::TorchModel, jptr);
+  return static_cast<jint>(ptr->get_item_embedding_dim());
 }
 
 /*
@@ -406,7 +450,7 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
 void gcn_add_parameters(JNIEnv *env,
                         std::vector<torch::jit::IValue> *inputs,
                         std::vector<std::pair<std::string, void *>> *ptrs,
-                        jobject jparams) {
+                        jobject jparams, jboolean sparse) {
     using namespace angel;
 
     // calculate x dimension and add x
@@ -416,7 +460,13 @@ void gcn_add_parameters(JNIEnv *env,
         if (jni_map_contain(env, jparams, x_key)) {
             jarray x = (jarray) jni_map_get(env, jparams, x_key);
             int x_num = env->GetArrayLength(x) / feature_dim;
+            if (sparse) {
+              int embedding_dim = jni_map_get_int(env, jparams, "embedding_dim");
+              int x_num = env->GetArrayLength(x) / embedding_dim;
+              add_input(env, inputs, ptrs, jparams, {x_num, embedding_dim}, TORCH_OPTION_FLOAT_GRAD, x_key);
+            } else {
             add_input(env, inputs, ptrs, jparams, {x_num, feature_dim}, TORCH_OPTION_FLOAT, x_key);
+            }
         }
 
     // add edge_index
@@ -480,7 +530,13 @@ void gcn_add_parameters(JNIEnv *env,
           if (jni_map_contain(env, jparams, u_key)) {
               jarray u = (jarray) jni_map_get(env, jparams, u_key);
               int u_num = env->GetArrayLength(u) / user_feature_dim;
-              add_input(env, inputs, ptrs, jparams, {u_num, user_feature_dim}, TORCH_OPTION_FLOAT, u_key);
+              if (sparse) {
+                  int embedding_dim = jni_map_get_int(env, jparams, "u_embedding_dim");
+                  int u_num = env->GetArrayLength(u) / embedding_dim;
+                  add_input(env, inputs, ptrs, jparams, {u_num, embedding_dim}, TORCH_OPTION_FLOAT_GRAD, u_key);
+              } else {
+                  add_input(env, inputs, ptrs, jparams, {u_num, user_feature_dim}, TORCH_OPTION_FLOAT, u_key);
+              }
           }
       }
     }
@@ -491,7 +547,13 @@ void gcn_add_parameters(JNIEnv *env,
           if (jni_map_contain(env, jparams, i_key)) {
               jarray i = (jarray) jni_map_get(env, jparams, i_key);
               int i_num = env->GetArrayLength(i) / item_feature_dim;
-              add_input(env, inputs, ptrs, jparams, {i_num, item_feature_dim}, TORCH_OPTION_FLOAT, i_key);
+              if (sparse) {
+                  int embedding_dim = jni_map_get_int(env, jparams, "i_embedding_dim");
+                  int i_num = env->GetArrayLength(i) / embedding_dim;
+                  add_input(env, inputs, ptrs, jparams, {i_num, embedding_dim}, TORCH_OPTION_FLOAT_GRAD, i_key);
+              } else {
+                  add_input(env, inputs, ptrs, jparams, {i_num, item_feature_dim}, TORCH_OPTION_FLOAT, i_key);
+              }
           }
       }
     }
@@ -513,6 +575,24 @@ void gcn_add_parameters(JNIEnv *env,
             int bi_edge_num = env->GetArrayLength(bi_item_type_index);
             add_input(env, inputs, ptrs, jparams, {1, bi_edge_num}, TORCH_OPTION_INT32, bi_item_type_key);
         }
+    }
+
+    const std::vector<std::string> batch_keys = {"batch_ids", "u_batch_ids", "i_batch_ids", "neg_batch_ids", "neg_u_batch_ids", "neg_i_batch_ids"};
+    for (auto batch_key: batch_keys){
+        if (jni_map_contain(env, jparams, batch_key)) {
+            jarray batch_index = (jarray) jni_map_get(env, jparams, batch_key);
+            int batch_index_num = env->GetArrayLength(batch_index);
+            add_input(env, inputs, ptrs, jparams, {1, batch_index_num}, TORCH_OPTION_INT32, batch_key);
+    }
+    }
+
+    const std::vector<std::string> field_keys = {"field_ids", "u_field_ids", "i_field_ids", "neg_field_ids", "neg_u_field_ids", "neg_i_field_ids"};
+    for (auto field_key: field_keys){
+        if (jni_map_contain(env, jparams, field_key)) {
+            jarray field_index = (jarray) jni_map_get(env, jparams, field_key);
+            int field_index_num = env->GetArrayLength(field_index);
+            add_input(env, inputs, ptrs, jparams, {1, field_index_num}, TORCH_OPTION_INT32, field_key);
+    }
     }
 
 }
@@ -546,14 +626,14 @@ void gcn_set_grads(JNIEnv *env,
  * Signature: (JLjava/util/Map;)F
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
-        (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams) {
+        (JNIEnv *env, jclass jcls, jlong jptr, jobject jparams, jboolean sparse) {
     using namespace angel;
     DEFINE_MODEL_PTR(angel::TorchModel, jptr)
     // build inputs
     std::vector<torch::jit::IValue> inputs;
     std::vector<std::pair<std::string, void*>> ptrs;
 
-    gcn_add_parameters(env, &inputs, &ptrs, jparams);
+    gcn_add_parameters(env, &inputs, &ptrs, jparams, sparse);
     gcn_set_weights(env, ptr, &ptrs, jparams);
 
     // get targets if defined
@@ -569,6 +649,9 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
     ptr->zero_grad();
     auto loss = ptr->backward(inputs, targets);
     gcn_set_grads(env, ptr, ptrs, jparams);
+    if (sparse) {
+      set_grads(env, inputs, ptrs, jparams);
+    }
 
     release_array(env, ptrs, jparams);
     return loss;
@@ -587,7 +670,7 @@ JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
     std::vector<torch::jit::IValue> inputs;
     std::vector<std::pair<std::string, void *>> ptrs;
 
-    gcn_add_parameters(env, &inputs, &ptrs, jparams);
+    gcn_add_parameters(env, &inputs, &ptrs, jparams, false);
     gcn_set_weights(env, ptr, &ptrs, jparams);
 
     const char* method = env->GetStringUTFChars(jmethod, 0);
@@ -596,11 +679,11 @@ JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
 
     jarray joutput;
     if (output.dtype().id() == caffe2::TypeIdentifier::Get<float>()) {
-        joutput = env->NewFloatArray(static_cast<jsize>(output.numel()));
-        env->SetFloatArrayRegion((jfloatArray)joutput, 0, static_cast<jsize>(output.numel()), output.data_ptr<float>());
+      joutput = env->NewFloatArray(output.numel());
+      env->SetFloatArrayRegion((jfloatArray)joutput, 0, output.numel(), output.data<float>());
     } else if (output.dtype().id() == caffe2::TypeIdentifier::Get<int64_t>()) {
-        joutput = env->NewLongArray(static_cast<jsize>(output.numel()));
-        env->SetLongArrayRegion((jlongArray)joutput, 0, static_cast<jsize>(output.numel()), output.data_ptr<int64_t>());
+      joutput = env->NewLongArray(output.numel());
+      env->SetLongArrayRegion((jlongArray)joutput, 0, output.numel(), output.data<int64_t>());
     } else
         throw std::logic_error("the dtype for predict should be float or int64");
 
@@ -684,7 +767,7 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_gcnSave
     std::vector<std::pair<std::string, void *>> ptrs;
     gcn_set_weights(env, ptr, &ptrs, jparams);
     jstring jpath = (jstring) jni_map_get(env, jparams, "path");
-    const char* path = env->GetStringUTFChars(jpath, nullptr);
+    const char* path = env->GetStringUTFChars(jpath, 0);
     ptr->save(path);
     env->ReleaseStringUTFChars(jpath, path);
     release_array(env, ptrs, jparams);
