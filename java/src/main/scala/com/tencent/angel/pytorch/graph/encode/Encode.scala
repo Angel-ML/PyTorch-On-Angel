@@ -3,7 +3,7 @@ package com.tencent.angel.pytorch.graph.encode
 import com.tencent.angel.ml.math2.VFactory
 import com.tencent.angel.pytorch.io.DataLoaderUtils
 import com.tencent.angel.spark.context.PSContext
-import com.tencent.angel.spark.ml.graph.params.{HasDstNodeIdCol, HasIsWeighted, HasPartitionNum, HasSrcNodeIdCol, HasWeightCol}
+import com.tencent.angel.graph.utils.params.{HasDstNodeIdCol, HasIsWeighted, HasPartitionNum, HasSrcNodeIdCol, HasWeightCol}
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import org.apache.spark.SparkContext
 import org.apache.spark.ml.Transformer

@@ -17,10 +17,10 @@
 package com.tencent.angel.pytorch.examples
 
 import com.tencent.angel.conf.AngelConf
+import com.tencent.angel.graph.utils.GraphIO
 import com.tencent.angel.pytorch.graph.egonetwork.EgoNetwork
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
-import com.tencent.angel.spark.ml.graph.utils.GraphIO
 import org.apache.spark.{SparkConf, SparkContext}
 
 object EgoNetworkExample {

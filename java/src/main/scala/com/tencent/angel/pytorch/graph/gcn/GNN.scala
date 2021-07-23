@@ -23,7 +23,7 @@ import com.tencent.angel.pytorch.io.DataLoaderUtils
 import com.tencent.angel.pytorch.params._
 import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
-import com.tencent.angel.spark.ml.graph.params._
+import com.tencent.angel.graph.utils.params._
 import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.deploy.SparkHadoopUtil

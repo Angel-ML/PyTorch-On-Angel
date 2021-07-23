@@ -27,6 +27,7 @@ import com.tencent.angel.graph.client.sampleneighbor3.{SampleNeighbor => SampleN
 import com.tencent.angel.graph.client.sampleneighbor4.{SampleNeighbor => SampleNeighbor4, SampleNeighborParam => SampleNeighborParam4}
 import com.tencent.angel.graph.client.summary.{NnzEdge, NnzFeature, NnzNeighbor, NnzNode}
 import com.tencent.angel.graph.data.Node
+import com.tencent.angel.graph.psf.gcn.{GetLabels, GetLabelsResult}
 import com.tencent.angel.ml.math2.VFactory
 import com.tencent.angel.ml.math2.vector.{IntFloatVector, IntLongVector, LongFloatVector}
 import com.tencent.angel.ml.matrix.psf.aggr.enhance.ScalarAggrResult
@@ -36,7 +37,6 @@ import com.tencent.angel.ps.storage.partitioner.ColumnRangePartitioner
 import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.partition.LoadBalancePartitioner
-import com.tencent.angel.spark.ml.psf.gcn.{GetLabels, GetLabelsResult}
 import com.tencent.angel.spark.models.impl.{PSMatrixImpl, PSVectorImpl}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 import com.tencent.angel.spark.util.VectorUtils
@@ -159,7 +159,7 @@ class GNNPSModel(graph: PSMatrix,
                     types: Array[Int],
                     start: Int,
                     end: Int): Unit = {
-    val param = new InitNeighborParam5(graph.id, keys, indptr, neighbors, types, start, end)
+    val param = new InitNeighborParam5(graph.id, keys, indptr, neighbors, null, types, start, end)
     val func = new InitNeighbor5(param)
     graph.psfUpdate(func).get()
   }
