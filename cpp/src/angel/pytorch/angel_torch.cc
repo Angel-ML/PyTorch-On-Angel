@@ -390,27 +390,48 @@ void gcn_add_parameters(JNIEnv *env,
     // calculate x dimension and add x
     int feature_dim = jni_map_get_int(env, jparams, "feature_dim");
     const std::vector<std::string> x_keys = {"x", "pos_x", "neg_x"};
-    for (const auto &x_key: x_keys)
+    for (auto x_key: x_keys)
         if (jni_map_contain(env, jparams, x_key)) {
-            auto x = (jarray) jni_map_get(env, jparams, x_key);
+            jarray x = (jarray) jni_map_get(env, jparams, x_key);
             int x_num = env->GetArrayLength(x) / feature_dim;
             add_input(env, inputs, ptrs, jparams, {x_num, feature_dim}, TORCH_OPTION_FLOAT, x_key);
         }
 
     // add edge_index
-    const std::vector<std::string> edge_keys = {"edge_index", "first_edge_index", "second_edge_index"};
-    for (const auto &edge_key: edge_keys)
+    const std::vector<std::string> edge_keys = {"labeled_edge_index", "edge_index", "first_edge_index", "second_edge_index"};
+    for (auto edge_key: edge_keys)
         if (jni_map_contain(env, jparams, edge_key)) {
-            auto edge_index = (jarray) jni_map_get(env, jparams, edge_key);
+            jarray edge_index = (jarray) jni_map_get(env, jparams, edge_key);
             int edge_num = env->GetArrayLength(edge_index) / 2;
             add_input(env, inputs, ptrs, jparams, {2, edge_num}, TORCH_OPTION_INT64, edge_key);
         }
 
+    // add edge_index
+    const std::vector<std::string> weight_keys = {"edge_weight", "first_edge_weight", "second_edge_weight"};
+    for (auto weight_key: weight_keys)
+      if (jni_map_contain(env, jparams, weight_key)) {
+        jarray edge_index = (jarray) jni_map_get(env, jparams, weight_key);
+        int edge_num = env->GetArrayLength(edge_index);
+        add_input(env, inputs, ptrs, jparams, {1, edge_num}, TORCH_OPTION_FLOAT, weight_key);
+      }
+
+    // add edge_index
+    if (jni_map_contain(env, jparams, "edge_dim")) {
+          int edge_dim = jni_map_get_int(env, jparams, "edge_dim");
+          const std::vector<std::string> edge_feature_keys = {"edge_feature", "first_edge_feature", "second_edge_feature"};
+          for (auto edge_feature_key: edge_feature_keys)
+            if (jni_map_contain(env, jparams, edge_feature_key)) {
+                  jarray edge_index = (jarray) jni_map_get(env, jparams, edge_feature_key);
+                  int edge_num = env->GetArrayLength(edge_index) / edge_dim;
+                  add_input(env, inputs, ptrs, jparams, {edge_num, edge_dim}, TORCH_OPTION_FLOAT, edge_feature_key);
+            }
+    }
+
     // add edge_type
     const std::vector<std::string> types_keys = {"first_edge_type", "second_edge_type"};
-    for (const auto &type_key: types_keys) {
+    for (auto type_key: types_keys) {
         if (jni_map_contain(env, jparams, type_key)) {
-            auto types = (jarray) jni_map_get(env, jparams, type_key);
+        jarray types = (jarray) jni_map_get(env, jparams, type_key);
             int type_num = env->GetArrayLength(types);
             add_input(env, inputs, ptrs, jparams, {type_num}, TORCH_OPTION_INT64, type_key);
         }
@@ -420,9 +441,9 @@ void gcn_add_parameters(JNIEnv *env,
     if (jni_map_contain(env, jparams, "hidden_dim")) {
         int hidden_dim = jni_map_get_int(env, jparams, "hidden_dim");
         const std::vector<std::string> embedding_keys = {"embedding"};
-        for (const auto &embedding_key: embedding_keys) {
+        for (auto &embedding_key: embedding_keys) {
             if (jni_map_contain(env, jparams, embedding_key)) {
-                auto embed = (jarray) jni_map_get(env, jparams, embedding_key);
+                jarray embed = (jarray) jni_map_get(env, jparams, embedding_key);
                 int embed_num = env->GetArrayLength(embed) / hidden_dim;
                 add_input(env, inputs, ptrs, jparams, {embed_num, hidden_dim}, TORCH_OPTION_FLOAT, embedding_key);
             }
@@ -478,7 +499,7 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
         jarray jtargets = (jarray) jni_map_get(env, jparams, "targets");
         void* jtargets_cptr = env->GetPrimitiveArrayCritical(jtargets, &is_copy);
         targets = torch::from_blob(jtargets_cptr, {env->GetArrayLength(jtargets)}, TORCH_OPTION_FLOAT);
-        ptrs.emplace_back("targets", jtargets_cptr);
+        ptrs.push_back(std::make_pair("targets", jtargets_cptr));
     }
 
     ptr->zero_grad();
