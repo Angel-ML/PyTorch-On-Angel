@@ -54,23 +54,23 @@ The methods are similar for other algorithms.
           --conf spark.ps.jars=$SONA_ANGEL_JARS \
           --conf spark.ps.memory=5g \
           --conf spark.ps.log.level=INFO \
-          --conf spark.driver.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
-          --conf spark.executor.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
-          --conf spark.executor.extraLibraryPath=./torch/angel_libtorch \
-          --conf spark.driver.extraLibraryPath=./torch/angel_libtorch \
+          --conf spark.driver.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/torch-lib \
+          --conf spark.executor.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/torch-lib \
+          --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+          --conf spark.driver.extraLibraryPath=./torch/torch-lib \
           --conf spark.executorEnv.OMP_NUM_THREADS=2 \
           --conf spark.executorEnv.MKL_NUM_THREADS=2 \
           --queue $queue \
           --name "deepfm on angel" \
           --jars $SONA_SPARK_JARS  \
-          --archives angel_libtorch.zip#torch\  #path to c++ library files
-          --files deepfm.pt \   #path to pytorch script model
+          --archives torch.zip#torch\
+          --files deepfm.pt \
           --driver-memory 5g \
           --num-executors 5 \
           --executor-cores 1 \
           --executor-memory 5g \
           --class com.tencent.angel.pytorch.examples.supervised.RecommendationExample \
-          ./pytorch-on-angel-*.jar \   # jar from Compiling java submodule
+          ./pytorch-on-angel-0.3.0.jar \
           trainInput:$input batchSize:128 torchModelPath:deepfm.pt \
           stepSize:0.001 numEpoch:10 testRatio:0.1 \
           angelModelOutputPath:$output \

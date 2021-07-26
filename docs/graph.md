@@ -46,23 +46,23 @@ Here we give an example of how to run GraphSage algorithm beyond Pytorch on Ange
           --conf spark.ps.jars=$SONA_ANGEL_JARS \
           --conf spark.ps.memory=5g \
           --conf spark.ps.log.level=INFO \
-          --conf spark.driver.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
-          --conf spark.executor.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
-          --conf spark.executor.extraLibraryPath=./torch/angel_libtorch \
-          --conf spark.driver.extraLibraryPath=./torch/angel_libtorch \
+          --conf spark.driver.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/torch-lib \
+          --conf spark.executor.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/torch-lib \
+          --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+          --conf spark.driver.extraLibraryPath=./torch/torch-lib \
           --conf spark.executorEnv.OMP_NUM_THREADS=2 \
           --conf spark.executorEnv.MKL_NUM_THREADS=2 \
           --queue $queue \
           --name "graphsage-angel" \
           --jars $SONA_SPARK_JARS  \
-          --archives angel_libtorch.zip#torch\  #path to c++ library files
-          --files graphsage_cora.pt \   #path to pytorch script model
+          --archives torch.zip#torch\
+          --files graphsage_cora.pt \
           --driver-memory 5g \
           --num-executors 5 \
           --executor-cores 1 \
           --executor-memory 5g \
           --class com.tencent.angel.pytorch.example.supervised.GCNExample \
-          ./pytorch-on-angel-1.0-SNAPSHOT.jar \   # jar from Compiling java submodule
+          ./pytorch-on-angel-0.3.0.jar \
           edgePath:$edgePath featurePath:$featurePath labelPath:$labelPath\
           torchModelPath:graphsage_cora.pt featureDim:1433 stepSize:0.01\
           optimizer:adam numEpoch:10 testRatio:0.5\
@@ -93,7 +93,3 @@ Here we give an example of how to run GraphSage algorithm beyond Pytorch on Ange
 
     **Notes:**
     - The model file, graphsage_cora.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
-
-
-
-
