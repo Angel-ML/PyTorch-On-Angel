@@ -20,6 +20,7 @@ from .bisage_conv import BiSAGEConv
 from .igmc_conv import IGMCConv
 from .hgat_conv import HGATConv
 from .rgcn_conv import RGCNConv
+from .han_conv import HANConv
 
 __all__ = [
     'GCNConv',
@@ -33,4 +34,5 @@ __all__ = [
     'IGMCConv',
     'BiSAGEConv',
     'HGATConv',
+    'HANConv',
 ]
