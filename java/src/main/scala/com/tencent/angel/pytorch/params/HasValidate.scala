@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{IntParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasValidate extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val validatePeriods = new IntParam(this, "validatePeriods", "validatePeriods")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  setDefault(validatePeriods, Int.MaxValue)
 
-  setDefault(inputFeaturePath, "")
+  final def getValidatePeriods: Int = $(validatePeriods)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setValidatePeriods(value: Int): this.type = set(validatePeriods, value)
 
 }

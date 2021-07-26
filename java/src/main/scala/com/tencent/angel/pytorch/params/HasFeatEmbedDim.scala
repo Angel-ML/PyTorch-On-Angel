@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{IntParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasFeatEmbedDim extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val featEmbedDim = new IntParam(this, "featEmbedDim", "featEmbedDim")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  final def getFeatEmbedDim: Int = $(featEmbedDim)
 
-  setDefault(inputFeaturePath, "")
+  setDefault(featEmbedDim, 0)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setFeatEmbedDim(dim: Int): this.type = set(featEmbedDim, dim)
 
 }

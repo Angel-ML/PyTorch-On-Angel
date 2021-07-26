@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasWeighted extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val hasWeighted = new BooleanParam(this, "hasWeighted", "hasWeighted")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  setDefault(hasWeighted, false)
 
-  setDefault(inputFeaturePath, "")
+  final def getWeighted: Boolean = $(hasWeighted)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setHasWeighted(value: Boolean): this.type = set(hasWeighted, value)
 
 }
