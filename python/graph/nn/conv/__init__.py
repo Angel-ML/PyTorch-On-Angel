@@ -30,4 +30,5 @@ __all__ = [
     'EdgeSAGEConv',
     'RGCNConv',
     'IGMCConv',
+    'BiSAGEConv',
 ]
