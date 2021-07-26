@@ -20,13 +20,14 @@ import com.tencent.angel.ml.math2.storage.{IntFloatDenseVectorStorage, IntFloatS
 import com.tencent.angel.ml.math2.vector.IntFloatVector
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap
 
-object MakeFeature {
+object MakeBiFeature {
 
-  def makeFeatures(index: Long2IntOpenHashMap, featureDim: Int, model: GNNPSModel): Array[Float] = {
+  def makeFeatures(index: Long2IntOpenHashMap, featureDim: Int, model: BiSAGEPSModel, graphType: Int): Array[Float] = {
     val size = index.size()
     val x = new Array[Float](size * featureDim)
     val keys = index.keySet().toLongArray
-    val features = model.getFeatures(keys)
+    val features = model.getFeatures(keys, graphType)
+    //    assert(features.size() == keys.length)
     val it = features.long2ObjectEntrySet().fastIterator()
     while (it.hasNext) {
       val entry = it.next()
@@ -57,10 +58,10 @@ object MakeFeature {
     }
   }
 
-  def sampleFeatures(size: Int, featureDim: Int, model: GNNPSModel, dataFormat: String): Array[Float] = {
+  def sampleFeatures(size: Int, featureDim: Int, model: BiSAGEPSModel, graphType: Int, dataFormat: String): Array[Float] = {
     val x = new Array[Float](size * featureDim)
-    val features = model.sampleFeatures(size)
-    for (idx <- 0 until size){
+    val features = model.sampleFeatures(size, graphType)
+    for (idx <- 0 until size) {
       val f = if (features(idx) != null) features(idx) else {
         if (dataFormat == "dense") {
           new IntFloatVector(featureDim, new IntFloatDenseVectorStorage(featureDim))

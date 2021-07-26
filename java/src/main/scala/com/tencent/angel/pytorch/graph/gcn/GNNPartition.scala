@@ -16,10 +16,13 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
-import java.util.{Map => JMap}
+import java.util.{Random, Map => JMap}
 
+import com.tencent.angel.ml.math2.storage.IntFloatSparseVectorStorage
+import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 
 class GNNPartition(index: Int,
                    keys: Array[Long],
@@ -35,36 +38,33 @@ class GNNPartition(index: Int,
   def aloneNodes(model: GNNPSModel, numPartitions: Int): Array[Long] =
     model.getNodesWithOutDegree(index, numPartitions)
 
-  def makeParams(batchIdx: Array[Int],
-                 numSample: Int,
-                 featureDim: Int,
-                 model: GNNPSModel,
-                 isTraining: Boolean = true): JMap[String, Object] = ???
-
-  def makeParams(nodes: Array[Long],
-                 featureDim: Int,
-                 model: GNNPSModel): JMap[String, Object] = ???
-
   def trainEpoch(curEpoch: Int,
                  batchSize: Int,
                  model: GNNPSModel,
                  featureDim: Int,
                  optim: AsyncOptim,
-                 numSample: Int): (Double, Long, Int) = ???
+                 numSample: Int,
+                 fieldNum: Int,
+                 fieldMultiHot: Boolean): (Double, Long, Int) = ???
 
   def predictEpoch(curEpoch: Int,
                    batchSize: Int,
                    model: GNNPSModel,
                    featureDim: Int,
                    numSample: Int,
-                   isTest: Boolean = true): Iterator[(Array[Float], Array[Float])] = ???
+                   isTest: Boolean,
+                   fieldNum: Int,
+                   fieldMultiHot: Boolean): Iterator[(Array[Float], Array[Float])] = ???
 
   def genLabels(batchSize: Int,
                 model: GNNPSModel,
                 featureDim: Int,
                 numSample: Int,
                 numPartitions: Int,
-                parseAloneNodes: Boolean = true): Iterator[(Long, Long, String)] = ???
+                multiLabelsNum: Int,
+                parseAloneNodes: Boolean,
+                fieldNum: Int,
+                fieldMultiHot: Boolean): Iterator[(Long, String, String)] = ???
 
   //return pred and embedding
   def genLabelsEmbedding(batchSize: Int,
@@ -72,14 +72,19 @@ class GNNPartition(index: Int,
                          featureDim: Int,
                          numSample: Int,
                          numPartitions: Int,
-                         parseAloneNodes: Boolean = true): Iterator[(Long, Long, String, String)] = ???
+                         multiLabelsNum: Int,
+                         parseAloneNodes: Boolean,
+                         fieldNum: Int,
+                         fieldMultiHot: Boolean): Iterator[(Long, String, String, String)] = ???
 
   def genEmbedding(batchSize: Int,
                    model: GNNPSModel,
                    featureDim: Int,
                    numSample: Int,
                    numPartitions: Int,
-                   parseAloneNodes: Boolean = true): Iterator[(Long, String)] = {
+                   parseAloneNodes: Boolean,
+                   fieldNum: Int,
+                   fieldMultiHot: Boolean): Iterator[(Long, String)] = {
 
     val batchIterator = keys.indices.sliding(batchSize, batchSize)
     val weights = model.readWeights()
@@ -95,7 +100,7 @@ class GNNPartition(index: Int,
       override def next: Array[(Long, String)] = {
         val batch = batchIterator.next().toArray
         val output = genEmbeddingBatch(batch, model, featureDim,
-          numSample, weights, torch)
+          numSample, weights, torch, fieldNum, fieldMultiHot)
         output.toArray
       }
     }
@@ -110,7 +115,7 @@ class GNNPartition(index: Int,
         override def next: Array[(Long, String)] = {
           val batch = aloneBatchIterator.next()
           val outputs = genEmbeddingBatchAloneNodes(batch, model,
-            featureDim, weights, torch)
+            featureDim, weights, torch, fieldNum, fieldMultiHot)
           outputs.toArray
         }
       }
@@ -121,16 +126,17 @@ class GNNPartition(index: Int,
     }
   }
 
-
   def genEmbeddingBatch(batchIdx: Array[Int],
                         model: GNNPSModel,
                         featureDim: Int,
                         numSample: Int,
                         weights: Array[Float],
-                        torch: TorchModel): Iterator[(Long, String)] = {
+                        torch: TorchModel,
+                        fieldNum: Int,
+                        fieldMultiHot: Boolean): Iterator[(Long, String)] = {
 
     val batchIds = batchIdx.map(idx => keys(idx))
-    val params = makeParams(batchIdx, numSample, featureDim, model, false)
+    val params = makeParams(batchIdx, numSample, featureDim, model, false, fieldNum, fieldMultiHot)
     params.put("weights", weights)
     val output = torch.gcnEmbedding(params)
     assert(output.length % batchIdx.length == 0)
@@ -142,12 +148,22 @@ class GNNPartition(index: Int,
     }
   }
 
+  def makeParams(batchIdx: Array[Int],
+                 numSample: Int,
+                 featureDim: Int,
+                 model: GNNPSModel,
+                 isTraining: Boolean = true,
+                 fieldNum: Int,
+                 fieldMultiHot: Boolean): JMap[String, Object] = ???
+
   def genEmbeddingBatchAloneNodes(nodes: Array[Long],
                                   model: GNNPSModel,
                                   featureDim: Int,
                                   weights: Array[Float],
-                                  torch: TorchModel): Iterator[(Long, String)] = {
-    val params = makeParams(nodes, featureDim, model)
+                                  torch: TorchModel,
+                                  fieldNum: Int,
+                                  fieldMultiHot: Boolean): Iterator[(Long, String)] = {
+    val params = makeParams(nodes, featureDim, model, fieldNum, fieldMultiHot)
     params.put("weights", weights)
     val output = torch.gcnEmbedding(params)
     assert(output.length % nodes.length == 0)
@@ -156,6 +172,42 @@ class GNNPartition(index: Int,
       .zip(nodes.iterator).map {
       case (h, key) => // h is representation for node ``key``
         (key, h.mkString(","))
+    }
+  }
+
+  def makeParams(nodes: Array[Long],
+                 featureDim: Int,
+                 model: GNNPSModel,
+                 fieldNum: Int,
+                 fieldMultiHot: Boolean): JMap[String, Object] = ???
+
+  def makeEmbeddingGrad(grad: Array[Float], embedding: Array[Vector], featIds: Array[Int], embeddingDim: Int): Unit = {
+    val grads = embedding.map(f => new Int2FloatOpenHashMap(f.getSize.toInt))
+
+    for (i <- featIds.indices) {
+      for (j <- 0 until embeddingDim) {
+        grads(j).addTo(featIds(i), grad(i * embeddingDim + j))
+      }
+    }
+
+    embedding.zip(grads).foreach {
+      case (e, g) => e.setStorage(new IntFloatSparseVectorStorage(e.dim().toInt, g))
+    }
+  }
+
+  def sampleTrainData(indices: Range, ratio: Float): IndexedSeq[Int] = {
+    if (ratio == 1.0f) {
+      indices
+    } else {
+      val random = new Random(System.currentTimeMillis())
+      val len = indices.length
+      val start = (random.nextDouble() * len).toInt
+      val count = (ratio * len).toInt
+      if ((start + count) < len) {
+        indices.slice(start, start + count)
+      } else {
+        indices.slice(start, len).++(indices.slice(0, count - (len - start)))
+      }
     }
   }
 

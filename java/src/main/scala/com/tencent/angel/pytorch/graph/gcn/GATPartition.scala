@@ -17,24 +17,19 @@
 package com.tencent.angel.pytorch.graph.gcn
 
 import java.util.{HashMap => JHashMap, Map => JMap}
-
-import com.tencent.angel.exception.AngelException
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList, LongOpenHashSet}
 
-class RGCNPartition(index: Int,
-                    keys: Array[Long],
-                    indptr: Array[Int],
-                    neighbors: Array[Long],
-                    types: Array[Int],
-                    trainIdx: Array[Int],
-                    trainLabels: Array[Array[Float]],
-                    testIdx: Array[Int],
-                    testLabels: Array[Array[Float]],
-                    torchModelPath: String,
-                    useSecondOrder: Boolean) extends
-  GCNPartition(index, keys, indptr, neighbors, trainIdx, trainLabels,
-    testIdx, testLabels, torchModelPath, useSecondOrder) {
-
+class GATPartition(index: Int,
+                   keys: Array[Long],
+                   indptr: Array[Int],
+                   neighbors: Array[Long],
+                   trainIdx: Array[Int],
+                   trainLabels: Array[Array[Float]],
+                   testIdx: Array[Int],
+                   testLabels: Array[Array[Float]],
+                   torchModelPath: String,
+                   useSecondOrder: Boolean) extends
+  GCNPartition(index, keys, indptr, neighbors, trainIdx, trainLabels, testIdx, testLabels, torchModelPath, useSecondOrder) {
 
   override
   def makeParams(batchIdx: Array[Int],
@@ -48,26 +43,22 @@ class RGCNPartition(index: Int,
     val index = new Long2IntOpenHashMap()
     val srcs = new LongArrayList()
     val dsts = new LongArrayList()
-    val edgeTypes = new LongArrayList()
 
     for (idx <- batchIdx) {
       batchKeys.add(keys(idx))
       index.put(keys(idx), index.size())
     }
 
-    val (first, firstTypes, second, secondTypes) = MakeEdgeIndex.makeEdgeIndex(batchIdx,
-      keys, indptr, neighbors, types, srcs, dsts,
-      edgeTypes, batchKeys, index, numSample, model)
+    val (first, second) = MakeEdgeIndex.makeEdgeIndexForAllEdge(batchIdx,
+      keys, indptr, neighbors, srcs, dsts,
+      batchKeys, index, numSample, model, useSecondOrder)
 
     val params = new JHashMap[String, Object]()
     val (x, batchIds, fieldIds) = MakeSparseBiFeature.makeFeatures(index, featureDim, model, -1, params, fieldNum, fieldMultiHot)
 
     params.put("first_edge_index", first)
-    params.put("first_edge_type", firstTypes)
-    if (useSecondOrder) {
+    if (second != null)
       params.put("second_edge_index", second)
-      params.put("second_edge_type", secondTypes)
-    }
     params.put("x", x)
     if (fieldNum > 0) {
       params.put("batch_ids", batchIds)
@@ -76,16 +67,6 @@ class RGCNPartition(index: Int,
     params.put("batch_size", new Integer(batchIdx.length))
     params.put("feature_dim", new Integer(featureDim))
     params
-
-  }
-
-  override
-  def makeParams(nodes: Array[Long],
-                 featureDim: Int,
-                 model: GNNPSModel,
-                 fieldNum: Int,
-                 fieldMultiHot: Boolean): JMap[String, Object] = {
-    throw new AngelException("cannot determine edge types for nodes without edges")
   }
 
 }
