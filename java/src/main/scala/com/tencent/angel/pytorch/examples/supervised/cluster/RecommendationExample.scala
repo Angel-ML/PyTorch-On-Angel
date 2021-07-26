@@ -53,7 +53,6 @@ object RecommendationExample {
     val rowType = params.getOrElse("rowType", "T_FLOAT_DENSE")
     val evals = params.getOrElse("evals", "auc")
     val level = params.getOrElse("storageLevel", "memory_only").toUpperCase()
-    val shuffleInterval = params.getOrElse("shuffleInterval", "1000000").toInt
 
     torchModelPath = FileUtils.getPtName("./")
     println("torchModelPath is: " + torchModelPath)
@@ -69,7 +68,6 @@ object RecommendationExample {
     recommendation.setEvaluations(evals)
     recommendation.setStorageLevel(StorageLevel.fromString(level))
 
-    recommendation.setShuffleInterval(shuffleInterval)
     val conf = start(mode)
     val numPartitions = PartitionUtils.getDataPartitionNum(numDataPartitions, conf, numPartitionsFactor)
     println(s"numDataPartitions=$numPartitions")

@@ -114,11 +114,6 @@ object RGCNExample {
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
     val labels = if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath)
 
-    DataStatistics.setAppName(rgcn.getClass.getCanonicalName)
-    DataStatistics.calcRDDSize(edges, "angel.input.edges.data")
-    DataStatistics.calcRDDSize(features, "angel.input.features.data")
-    DataStatistics.calcRDDSize(labels, "angel.input.labels.data")
-
     val (model, graph) = rgcn.initialize(edges, features, Option(labels))
     rgcn.showSummary(model, graph)
 
