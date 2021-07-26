@@ -7,13 +7,14 @@ import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
 from nn.conv import HGATConv
+from utils import parse_feat
 
 
 class UnsupervisedHGAT(torch.jit.ScriptModule):
 
     def __init__(self, in_u_dim, in_i_dim, u_embedding_dim, i_embedding_dim,
                  u_field_num, i_field_num, hidden, out_dim, heads, dropout,
-                 negative_size):
+                 negative_size, encode):
         super(UnsupervisedHGAT, self).__init__()
         # bipartite graph, two types of nodes, namely u,i. Edges: (u, i)
 
@@ -26,6 +27,7 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
         self.heads = heads
         self.dropout = dropout
         self.negative_size = negative_size
+        self.encode = encode
 
         # the transformed dense feature dimension for user and item
         in_u_dim = u_embedding_dim * u_field_num if u_embedding_dim > 0 else in_u_dim
@@ -92,37 +94,13 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
         return u_emb, i_emb
 
     @torch.jit.script_method
-    def parse_feat(self, x, batch_ids, field_ids, field_num):
-        # type: (Tensor, Tensor, Tensor, int) -> Tensor
-        k = x.size(1)# embedding_dim
-        b = torch._unique(batch_ids, sorted=False)[0].size(0)# batchsize
-        f = field_num
-        t_index = [batch_ids.view(-1).to(torch.long), field_ids.view(-1).to(torch.long)]
-        e_transpose = x.view(-1, k).transpose(0, 1)
-        count = torch.ones(x.size(0))
-
-        hs = []
-        for i in range(k):
-            h = torch.zeros(b, f)
-            c = torch.zeros(b, f)
-            h.index_put_(t_index, e_transpose[i], True)
-            c.index_put_(t_index, count, True) # sum
-            h = h / c.clamp(min=1) # avg
-            hs.append(h.view(-1, 1))
-
-        emb_cat = torch.cat(hs, dim=1)
-        output = emb_cat.view(b, -1)
-
-        return output
-
-    @torch.jit.script_method
     def encode_feat(self, u, i,
                     u_batch_ids=torch.Tensor([]), i_batch_ids=torch.Tensor([]),
                     u_field_ids=torch.Tensor([]), i_field_ids=torch.Tensor([])):
 
         if self.user_field_num > 0:
-            u = self.parse_feat(u, u_batch_ids, u_field_ids, self.user_field_num)
-            i = self.parse_feat(i, i_batch_ids, i_field_ids, self.item_field_num)
+            u = parse_feat(u, u_batch_ids, u_field_ids, self.user_field_num, self.encode)
+            i = parse_feat(i, i_batch_ids, i_field_ids, self.item_field_num, self.encode)
 
         u = torch.matmul(u, self.weight_u1)
         i = torch.matmul(i, self.weight_i1)
@@ -241,7 +219,8 @@ def main():
                               FLAGS.input_user_field_num,
                               FLAGS.input_item_field_num,
                               FLAGS.hidden_dim, FLAGS.output_dim,
-                              FLAGS.heads, FLAGS.dropout, FLAGS.negative_size)
+                              FLAGS.heads, FLAGS.dropout, FLAGS.negative_size,
+                              FLAGS.encode)
     bisage.save(FLAGS.output_file)
 
 
@@ -302,6 +281,11 @@ if __name__ == '__main__':
         type=int,
         default=1,
         help="the negative sample size")
+    parser.add_argument(
+        "--encode",
+        type=str,
+        default="dense",
+        help="data encode, could be one-hot, multi-hot or dense")
     parser.add_argument(
         "--output_file",
         type=str,
