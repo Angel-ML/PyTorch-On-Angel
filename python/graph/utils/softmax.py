@@ -13,17 +13,20 @@
 # the License.
 #
 import torch
-from .num_nodes import maybe_num_nodes
-from utils import scatter_add, scatter_max
 
+import torch_scatter
+from utils import scatter_add
+from .num_nodes import maybe_num_nodes
 
 @torch.jit.script
-def softmax(src, index, num_nodes):
-    # type: (Tensor, Tensor, int) -> Tensor
+def softmax(src, index, num_nodes=None):
+    # type: (Tensor, Tensor, Optional[int]) -> Tensor
+
     num_nodes = maybe_num_nodes(index, num_nodes)
 
-    out = src - scatter_max(src, index, dim=0, dim_size=num_nodes)[index]
+    out, argmax = torch_scatter.scatter_max(src, index, dim=0, dim_size=num_nodes)
+    out = src - out[index]
     out = out.exp() / (
-            scatter_add(out, index, dim=0, dim_size=num_nodes)[index] + 1e-16)
+        scatter_add(out.exp(), index, dim=0, dim_size=num_nodes)[index] + 1e-16)
 
     return out
