@@ -19,34 +19,25 @@ import argparse
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
-
 from nn.conv import RGCNConv
-
-
-class RGCN(torch.jit.ScriptModule):
-
-    def __init__(self, input_dim, hidden_dim, n_relations, n_bases, n_class):
-        super(RGCN, self).__init__()
-        self.conv1 = RGCNConv(input_dim, hidden_dim, n_relations, n_bases)
-        self.conv2 = RGCNConv(hidden_dim, n_class, n_relations, n_bases)
-
-    @torch.jit.script_method
-    def forward_(self, x, edge_index, edge_type, edge_norm):
-        # type: (Optional[Tensor], Tensor, Tensor, Optional[Tensor]) -> Tensor
-        x = F.relu(self.conv1(x, edge_index, edge_type, edge_norm))
-        x = self.conv2(x, edge_index, edge_type, edge_norm)
-        return F.log_softmax(x, dim=1)
-
-    @torch.jit.script_method
-    def loss(self, y_pred, y_true):
-        y_true = y_true.view(-1).to(torch.long)
-        return F.nll_loss(y_pred, y_true)
 
 
 class RelationGCN(torch.jit.ScriptModule):
 
-    def __init__(self, input_dim, hidden_dim, n_relations, n_bases, n_class):
+    def __init__(self, input_dim, hidden_dim, n_relations, n_bases, n_class,
+        task_type, class_weights=""):
         super(RelationGCN, self).__init__()
+        # loss func for multi label classification
+        self.loss_fn = torch.nn.BCELoss()
+        self.task_type = task_type
+        self.class_weights = class_weights
+
+        if len(class_weights) > 2:
+            self.class_weights = \
+                torch.tensor(list(map(float, class_weights.split(",")))).to(torch.float)
+        else:
+            self.class_weights = None
+
         self.conv1 = RGCNConv(input_dim, hidden_dim, n_relations, n_bases)
         self.conv2 = RGCNConv(hidden_dim, hidden_dim, n_relations, n_bases)
         self.weight = Parameter(torch.zeros(hidden_dim, n_class))
@@ -64,18 +55,31 @@ class RelationGCN(torch.jit.ScriptModule):
         x = self.embedding_(x, first_edge_index, second_edge_index, first_edge_type, second_edge_type)
         x = torch.matmul(x, self.weight)
         x = x + self.bias
-        return F.log_softmax(x, dim=1)
+        if self.task_type == "classification":
+            return F.log_softmax(x, dim=1)
+        else:
+            return F.sigmoid(x)
 
     @torch.jit.script_method
     def loss(self, y_pred, y_true):
-        y_true = y_true.view(-1).to(torch.long)
-        return F.nll_loss(y_pred, y_true)
+        if self.task_type == "classification":
+            y_true = y_true.view(-1).to(torch.long)
+            if self.class_weights is None:
+                return F.nll_loss(y_pred, y_true)
+            else:
+                return F.nll_loss(y_pred, y_true, weight=self.class_weights)
+        else:
+            u_true = y_true.reshape(y_pred.size())
+            return self.loss_fn(y_pred, u_true)
 
     @torch.jit.script_method
     def predict_(self, x, first_edge_index, second_edge_index, first_edge_type, second_edge_type):
         # type: (Optional[Tensor], Tensor, Tensor, Tensor, Tensor) -> Tensor
         output = self.forward_(x, first_edge_index, second_edge_index, first_edge_type, second_edge_type)
-        return output.max(1)[1]
+        if self.task_type == "classification":
+            return output.max(1)[1]
+        else:
+            return output
 
     @torch.jit.script_method
     def embedding_(self, x, first_edge_index, second_edge_index, first_edge_type, second_edge_type):
@@ -89,7 +93,9 @@ FLAGS = None
 
 
 def main():
-    rgcn = RelationGCN(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.n_relations, FLAGS.n_bases, FLAGS.n_class)
+    rgcn = RelationGCN(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.n_relations,
+                       FLAGS.n_bases, FLAGS.n_class, FLAGS.task_type,
+                       FLAGS.class_weights)
     rgcn.save(FLAGS.output_file)
 
 
@@ -125,5 +131,15 @@ if __name__ == '__main__':
         type=int,
         default=30,
         help="the number of bases in rgcn model")
+    parser.add_argument(
+        "--task_type",
+        type=str,
+        default="classification",
+        help="classification or multi-label-classification")
+    parser.add_argument(
+        "--class_weights",
+        type=str,
+        default="",
+        help="class weights, in order to balance class, such as: 0.1,0.9")
     FLAGS, unparsed = parser.parse_known_args()
     main()
