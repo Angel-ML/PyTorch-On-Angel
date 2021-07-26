@@ -18,14 +18,13 @@ package com.tencent.angel.pytorch.params
 
 import org.apache.spark.ml.param.{Param, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasTaskType extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val taskType = new Param[String](this, "taskType", "taskType")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  final def getTaskType: String = $(taskType)
 
-  setDefault(inputFeaturePath, "")
+  setDefault(taskType, "classification")
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
-
+  final def setTaskType(tType: String): this.type = set(taskType, tType)
 }

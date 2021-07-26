@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{IntParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasPSModelCheckpointInterval extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val checkpointInterval = new IntParam(this, "checkpointInterval", "checkpointInterval")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  setDefault(checkpointInterval, Int.MaxValue)
 
-  setDefault(inputFeaturePath, "")
+  final def getCheckpointInterval: Int = $(checkpointInterval)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setCheckpointInterval(value: Int): this.type = set(checkpointInterval, value)
 
 }

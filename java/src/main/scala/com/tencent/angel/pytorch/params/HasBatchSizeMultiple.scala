@@ -16,16 +16,15 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{IntParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasBatchSizeMultiple extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val batchSizeMultiple = new IntParam(this, "batchSizeMultiple", "batchSizeMultiple")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  final def getBatchSizeMultiple: Int = $(batchSizeMultiple)
 
-  setDefault(inputFeaturePath, "")
+  setDefault(batchSizeMultiple, 10)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
-
+  final def setBatchSizeMultiple(value: Int): this.type = set(batchSizeMultiple, value)
 }

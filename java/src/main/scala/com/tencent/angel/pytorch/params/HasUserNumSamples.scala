@@ -16,16 +16,14 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{IntParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasUserNumSamples extends Params {
+  final val userNumSamples = new IntParam(this, "userNumSamples", "userNumSamples")
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final def getUserNumSamples: Int = $(userNumSamples)
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  setDefault(userNumSamples, 5)
 
-  setDefault(inputFeaturePath, "")
-
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
-
+  final def setUserNumSamples(value: Int): this.type = set(userNumSamples, value)
 }

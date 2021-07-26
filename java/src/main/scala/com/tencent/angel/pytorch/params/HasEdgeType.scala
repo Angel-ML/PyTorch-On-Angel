@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasEdgeType extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val hasEdgeType = new BooleanParam(this, "hasEdgeType", "hasEdgeType")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  setDefault(hasEdgeType, false)
 
-  setDefault(inputFeaturePath, "")
+  final def getHasEdgeType: Boolean = $(hasEdgeType)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setHasEdgeType(value: Boolean): this.type = set(hasEdgeType, value)
 
 }

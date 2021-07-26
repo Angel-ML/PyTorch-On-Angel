@@ -16,16 +16,15 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasUseSharedSamples extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val useSharedSamples = new BooleanParam(this, "useSharedSamples", "useSharedSamples")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  final def UseSharedSamples: Boolean = $(useSharedSamples)
 
-  setDefault(inputFeaturePath, "")
+  setDefault(useSharedSamples, true)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
-
+  final def setUseSharedSamples(flag: Boolean): this.type = set(useSharedSamples, flag)
 }

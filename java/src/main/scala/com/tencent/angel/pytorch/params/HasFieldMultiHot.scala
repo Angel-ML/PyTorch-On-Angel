@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
-trait HasInputFeaturePath extends Params {
+trait HasFieldMultiHot extends Params {
 
-  final val inputFeaturePath = new Param[String](this, "inputFeaturePath", "inputFeaturePath")
+  final val fieldMultiHot = new BooleanParam(this, "fieldMultiHot", "fieldMultiHot")
 
-  final def getInputFeaturePath: String = $(inputFeaturePath)
+  final def getFieldMultiHot: Boolean = $(fieldMultiHot)
 
-  setDefault(inputFeaturePath, "")
+  setDefault(fieldMultiHot, false)
 
-  final def setInputFeaturePath(path: String): this.type = set(inputFeaturePath, path)
+  final def setFieldMultiHot(multiHot: Boolean): this.type = set(fieldMultiHot, multiHot)
 
 }
