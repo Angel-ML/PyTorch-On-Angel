@@ -17,13 +17,12 @@
 package com.tencent.angel.pytorch.graph.gcn
 
 import java.io.File
-
 import com.tencent.angel.pytorch.data.SampleParser
 import com.tencent.angel.pytorch.io.DataLoaderUtils
 import com.tencent.angel.pytorch.params._
 import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
-import com.tencent.angel.spark.ml.graph.params._
+import com.tencent.angel.graph.utils.params._
 import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
@@ -40,8 +39,10 @@ class GNN(val uid: String) extends Serializable
   with HasTorchModelPath with HasBatchSize with HasFeatureDim
   with HasOptimizer with HasNumEpoch with HasNumSamples with HasNumBatchInit
   with HasPartitionNum with HasPSPartitionNum with HasUseBalancePartition
-  with HasDataFormat with HasStorageLevel with  HasModelCheckPoint with HasPSModelCheckpoint
-  with HasEvaluation {
+  with HasDataFormat with HasStorageLevel with HasModelCheckPoint with HasPSModelCheckpointInterval
+  with HasEvaluation with HasUseSecondOrder with HasPSModelCheckpoint  with HasBatchSizeMultiple
+  with HasNumLabels  with HasFeatEmbedPath with HasFeatEmbedDim with HasFieldNum with HasFieldMultiHot {
+
 
   def this() = this(Identifiable.randomUID("GNN"))
 
@@ -49,56 +50,8 @@ class GNN(val uid: String) extends Serializable
 
   def fit(model: GNNPSModel, graph: Dataset[_], checkPointPath: String = null): Unit = ???
 
-  def initFeatures(model: GNNPSModel, features: Dataset[Row], minId: Long, maxId: Long): Unit = {
-    features.rdd.filter(row => row.length > 0)
-      .filter(row => row.get(0) != null)
-      .map(row => (row.getLong(0), row.getString(1)))
-      .filter(f => f._1 >= minId && f._1 <= maxId)
-      .map(f => (f._1, SampleParser.parseFeature(f._2, $(featureDim), $(dataFormat))))
-      .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeFeaturePartition.apply(index, it)))
-      .map(_.init(model, $(numBatchInit))).count()
-  }
-
-  def initLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
-    labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
-      .filter(f => f._1 >= minId && f._1 <= maxId)
-      .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeLabelPartition.apply(index, it, model.dim)))
-      .map(_.init(model)).count()
-  }
-
-  def initTestLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
-    labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
-      .filter(f => f._1 >= minId && f._1 <= maxId)
-      .mapPartitionsWithIndex((index, it) =>
-        Iterator(NodeLabelPartition.apply(index, it, model.dim)))
-      .map(_.initTestLabels(model)).count()
-  }
-
-  def getMinMaxId(edges: DataFrame): (Long, Long, Long) =
-    edges.select("src", "dst").rdd
-      .map(row => (row.getLong(0), row.getLong(1)))
-      .filter(f => f._1 != f._2)
-      .mapPartitions(DataLoaderUtils.summarizeApplyOp)
-      .reduce(DataLoaderUtils.summarizeReduceOp)
-
-  def getPartitionIndex(edges: DataFrame): RDD[Long] =
-    edges.select("src", "dst").rdd
-      .map(row => (row.getLong(0), row.getLong(1)))
-      .filter(f => f._1 != f._2)
-      .flatMap(f => Iterator(f._1, f._2))
-
-
-  def makeGraph(edges: DataFrame, model: GNNPSModel): Dataset[_] = ???
-
   def initialize(edgeDF: DataFrame, featureDF: DataFrame): (GNNPSModel, Dataset[_]) =
     initialize(edgeDF, featureDF, None, None)
-
-  def initialize(edgeDF: DataFrame,
-                 featureDF: DataFrame,
-                 labelDF: Option[DataFrame]): (GNNPSModel, Dataset[_]) =
-    initialize(edgeDF, featureDF, labelDF, None)
 
   def initialize(edgeDF: DataFrame,
                  featureDF: DataFrame,
@@ -116,35 +69,123 @@ class GNN(val uid: String) extends Serializable
     TorchModel.setPath($(torchModelPath))
     val torch = TorchModel.get()
     val weightsSize = torch.getParametersTotalSize
-    println(s"weight total size=${weightsSize}")
+    println(s"weight total size=$weightsSize")
 
     PSContext.getOrCreate(SparkContext.getOrCreate())
 
-    val model = GNNPSModel.apply(minId, maxId + 1, weightsSize, getOptimizer,
-      getPartitionIndex(edgeDF), $(psPartitionNum), $(useBalancePartition))
+    // init ps model
+    val model = if ($(fieldNum) > 0) {
+      SparseGNNPSModel(minId, maxId + 1, weightsSize, getOptimizer, getPartitionIndex(edgeDF),
+        $(psPartitionNum), $(useBalancePartition), $(featEmbedDim), $(featureDim))
+    } else {
+      GNNPSModel.apply(minId, maxId + 1, weightsSize, getOptimizer,
+        getPartitionIndex(edgeDF), $(psPartitionNum), $(useBalancePartition))
+    }
 
     // initialize weights with torch values
     model.setWeights(torch.getParameters)
-    TorchModel.put(torch)
 
-    labelDF.foreach(f => initLabels(model, f, minId, maxId))
-    testLabelDF.foreach(f => initTestLabels(model, f, minId, maxId))
+    // initialize embeddings
+    if ($(fieldNum) > 0) {
+      if (${featEmbedPath}.length > 0) { // load sparse feature embedding
+        println(s"load sparse feature embedding from ${${featEmbedPath}}.")
+        model.asInstanceOf[SparseGNNPSModel].loadFeatEmbed(${featEmbedPath})
+      } else { // init sparse feature embedding
+        println(s"init sparse feature embedding.")
+        model.asInstanceOf[SparseGNNPSModel].initEmbeddings()
+      }
+    }
 
-    val graph = makeGraph(edgeDF, model)
+    val graph = makeGraph(edgeDF, model, labelDF, testLabelDF, minId, maxId)
     initFeatures(model, featureDF, minId, maxId)
+
+    // correct featureDim for sparse input after initFeatures
+    if ($(fieldNum) > 0) {
+      setFeatureDim($(featEmbedDim) * $(fieldNum))
+    }
+    TorchModel.put(torch)
 
     val end = System.currentTimeMillis()
     println(s"initialize cost ${(end - start) / 1000}s")
     val startTs = System.currentTimeMillis()
-    model.checkpointMatrices(0)
+    if ($(saveCheckpoint))
+      model.checkpointMatrices(0)
     println(s"Write checkpoint use time=${System.currentTimeMillis() - startTs}ms")
     (model, graph)
   }
 
+  def initFeatures(model: GNNPSModel, features: Dataset[Row], minId: Long, maxId: Long): Unit = {
+    features.select("node", "feature").rdd.filter(row => row.length > 0)
+      .filter(row => row.get(0) != null)
+      .map(row => (row.getLong(0), row.getString(1)))
+      .filter(f => f._1 >= minId && f._1 <= maxId)
+      .map(f => (f._1, SampleParser.parseFeature(f._2, $(featureDim), $(dataFormat))))
+      .repartition($(partitionNum))
+      .mapPartitionsWithIndex((index, it) =>
+        Iterator.single(NodeFeaturePartition.apply(index, it)))
+      .map(_.init(model, $(numBatchInit))).count()
+  }
+
+  def initLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
+    labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
+      .filter(f => f._1 >= minId && f._1 <= maxId)
+      .mapPartitionsWithIndex((index, it) =>
+        Iterator.single(NodeLabelPartition.apply(index, it, model.dim)))
+      .map(_.init(model)).count()
+  }
+
+  def initTestLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
+    labels.rdd.map(row => (row.getLong(0), row.getFloat(1)))
+      .filter(f => f._1 >= minId && f._1 <= maxId)
+      .mapPartitionsWithIndex((index, it) =>
+        Iterator.single(NodeLabelPartition.apply(index, it, model.dim)))
+      .map(_.initTestLabels(model)).count()
+  }
+
+  def initMultiLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
+    labels.rdd.map(row => row.getString(0)).map { x =>
+      val temp = x.split(" ")
+      (temp(0).toLong, Array(0f) ++ temp.slice(1, temp.length).map(_.toFloat)) // the first 0 indicates training labels
+    }.filter(f => f._1 >= minId && f._1 <= maxId)
+      .mapPartitionsWithIndex((index, it) =>
+        it.sliding(${numBatchInit}, ${numBatchInit}).map(pairs => model.initMultiLabelsByBatch(pairs)))
+      .count()
+  }
+
+  def initMultiTestLabels(model: GNNPSModel, labels: Dataset[Row], minId: Long, maxId: Long): Unit = {
+    labels.rdd.map(row => row.getString(0)).map { x =>
+      val temp = x.split(" ")
+      (temp(0).toLong, Array(1f) ++ temp.slice(1, temp.length).map(_.toFloat)) // the first 1 indicates testing labels
+    }.filter(f => f._1 >= minId && f._1 <= maxId)
+      .mapPartitionsWithIndex((index, it) =>
+        it.sliding(${numBatchInit}, ${numBatchInit}).map(pairs => model.initMultiLabelsByBatch(pairs)))
+      .count()
+  }
+
+  def getMinMaxId(edges: DataFrame): (Long, Long, Long) =
+    edges.select("src", "dst").rdd
+      .map(row => (row.getLong(0), row.getLong(1)))
+      .filter(f => f._1 != f._2)
+      .mapPartitions(DataLoaderUtils.summarizeApplyOp)
+      .reduce(DataLoaderUtils.summarizeReduceOp)
+
+  def getPartitionIndex(edges: DataFrame): RDD[Long] =
+    edges.select("src", "dst").rdd
+      .map(row => (row.getLong(0), row.getLong(1)))
+      .filter(f => f._1 != f._2)
+      .flatMap(f => Iterator(f._1, f._2))
+
+  def makeGraph(edges: DataFrame, model: GNNPSModel, labelDF: Option[DataFrame],
+                testLabelDF: Option[DataFrame], minId: Long, maxId: Long): Dataset[_] = ???
+
+  def initialize(edgeDF: DataFrame,
+                 featureDF: DataFrame,
+                 labelDF: Option[DataFrame]): (GNNPSModel, Dataset[_]) =
+    initialize(edgeDF, featureDF, labelDF, None)
 
   def genEmbedding(model: GNNPSModel, graph: Dataset[_]): DataFrame = {
     val ret = graph.rdd.flatMap(_.asInstanceOf[GNNPartition]
-      .genEmbedding($(batchSize) * 10, model, $(featureDim), $(numSamples), graph.rdd.getNumPartitions))
+      .genEmbedding($(batchSize) * $(batchSizeMultiple), model, $(featureDim), $(numSamples), graph.rdd.getNumPartitions, true, $(fieldNum), $(fieldMultiHot)))
       .map(f => Row.fromSeq(Seq[Any](f._1, f._2)))
 
     val schema = StructType(Seq(
@@ -157,12 +198,12 @@ class GNN(val uid: String) extends Serializable
 
   def genLabels(model: GNNPSModel, graph: Dataset[_]): DataFrame = {
     val ret = graph.rdd.flatMap(_.asInstanceOf[GNNPartition]
-      .genLabels($(batchSize) * 10, model, $(featureDim), $(numSamples), graph.rdd.getNumPartitions))
+      .genLabels($(batchSize) * $(batchSizeMultiple), model, $(featureDim), $(numSamples), graph.rdd.getNumPartitions, $(numLabels), true, $(fieldNum), $(fieldMultiHot)))
       .map(f => Row.fromSeq(Seq[Any](f._1, f._2, f._3)))
 
     val schema = StructType(Seq(
       StructField("node", LongType, nullable = false),
-      StructField("label", LongType, nullable = false),
+      StructField("label", StringType, nullable = false),
       StructField("softmax", StringType, nullable = false)
     ))
 
@@ -171,12 +212,13 @@ class GNN(val uid: String) extends Serializable
 
   def genLabelsEmbedding(model: GNNPSModel, graph: Dataset[_]): DataFrame = {
     val ret = graph.rdd.flatMap(_.asInstanceOf[GNNPartition]
-      .genLabelsEmbedding($(batchSize) * 10, model, $(featureDim), $(numSamples), graph.rdd.getNumPartitions))
+      .genLabelsEmbedding($(batchSize) * $(batchSizeMultiple), model, $(featureDim), $(numSamples),
+        graph.rdd.getNumPartitions, $(numLabels), true, $(fieldNum), $(fieldMultiHot)))
       .map(f => Row.fromSeq(Seq[Any](f._1, f._2, f._3, f._4)))
 
     val schema = StructType(Seq(
       StructField("node", LongType, nullable = false),
-      StructField("label", LongType, nullable = false),
+      StructField("label", StringType, nullable = false),
       StructField("embedding", StringType, nullable = false),
       StructField("softmax", StringType, nullable = false)
     ))
@@ -241,13 +283,24 @@ class GNN(val uid: String) extends Serializable
   }
 
   /**
+    * Save feature embedding of sparse feature
+    * @param model
+    * @param savePath
+    * @param curEpoch
+    */
+  def saveFeatEmbed(model: GNNPSModel, savePath: String, curEpoch: Int = -1): Unit = {
+    val path = if (curEpoch < 0) savePath + "/featEmbed" else savePath + s"/featEmbed_$curEpoch"
+    model.saveFeatEmbed(path)
+  }
+
+  /**
     * Write checkpoint or result if need
     *
     * @param epoch
     */
-  def checkpointIfNeed(model:GNNPSModel, epoch: Int): Unit = {
+  def checkpointIfNeed(model: GNNPSModel, epoch: Int): Unit = {
     var startTs = 0L
-    if ($(checkpointInterval) > 0  && epoch % $(checkpointInterval) == 0 && epoch < $(numEpoch)) {
+    if ($(checkpointInterval) > 0 && epoch % $(checkpointInterval) == 0 && epoch < $(numEpoch)) {
       println(s"Epoch=${epoch}, checkpoint the model")
       startTs = System.currentTimeMillis()
       model.checkpointMatrices(epoch)
