@@ -15,7 +15,8 @@
 
 from .sage_conv import SAGEConv
 from .gcn_conv import GCNConv, GCNConv2
-from .sage_conv import SAGEConv, SAGEConv2, SAGEConv3, SAGEConv4
+from .sage_conv import SAGEConv, SAGEConv2, SAGEConv3, SAGEConv4, EdgeSAGEConv
+from .bisage_conv import BiSAGEConv
 from .rgcn_conv import RGCNConv
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     'SAGEConv2',
     'SAGEConv3',
     'SAGEConv4',
+    'EdgeSAGEConv',
     'RGCNConv',
 ]
