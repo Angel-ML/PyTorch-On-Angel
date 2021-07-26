@@ -15,8 +15,8 @@
  *
  */
 package com.tencent.angel.pytorch.optim
-import java.util.concurrent.Future
 
+import java.util.concurrent.Future
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
 import com.tencent.angel.spark.ml.psf.optim.{AsyncAdagradFunc, AsyncOptimParam}
@@ -43,8 +43,12 @@ class AsyncAdagrad(eta: Double, decay: Double, factor: Double = 0.9)
   }
 
   override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
-    asyncUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+    asyncUpdate(matrix, offset, grads.indices.toArray, grads)
   }
 
+  override def getType: Int = 2
+
   override def toString: String = s"AsyncAdagrad ${super.toString}"
+
+  override def getFactor: Float = factor.toFloat
 }

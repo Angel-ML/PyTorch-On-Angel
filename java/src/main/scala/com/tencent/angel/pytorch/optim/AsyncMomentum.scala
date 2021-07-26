@@ -15,8 +15,8 @@
  *
  */
 package com.tencent.angel.pytorch.optim
-import java.util.concurrent.Future
 
+import java.util.concurrent.Future
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
 import com.tencent.angel.spark.ml.psf.optim.{AsyncMomentumFunc, AsyncOptimParam}
@@ -47,5 +47,9 @@ class AsyncMomentum(eta: Double, decay: Double, momentum: Double = 0.9)
     asyncUpdate(matrix, offset, grads.indices.toArray, grads)
   }
 
+  override def getType: Int = 1
+
   override def toString: String = s"AsyncMomentum ${super.toString}"
+
+  override def getMomentum: Float = momentum.toFloat
 }

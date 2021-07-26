@@ -17,7 +17,6 @@
 package com.tencent.angel.pytorch.optim
 
 import java.util.concurrent.Future
-
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
 import com.tencent.angel.spark.ml.psf.optim.{AsyncAdamFunc, AsyncOptimParam}
@@ -29,7 +28,6 @@ class AsyncAdam(eta: Double, decay: Double = 0.0, gamma: Double = 0.99, beta: Do
   override def getNumSlots(): Int = 3
 
   def getParam(matrixId: Int, grads: Array[Vector], offset: Int): UpdateParam = {
-    numSteps += 1
     new AsyncOptimParam(matrixId, grads, Array(getCurrentEta, gamma, beta), Array(offset, getNumSlots(), numSteps))
   }
 
@@ -49,6 +47,14 @@ class AsyncAdam(eta: Double, decay: Double = 0.0, gamma: Double = 0.99, beta: Do
   override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] =
     asyncUpdate(matrix, offset, grads.indices.toArray, grads)
 
+  override def getType: Int = 3
+
   override def toString: String =
     s"AsyncAdam ${super.toString}"
+
+  override def getBeta: Float = beta.toFloat
+
+  override def getGamma: Float = gamma.toFloat
+
+  override def getEpsilon: Float = 1.0E-8f
 }
