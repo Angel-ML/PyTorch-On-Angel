@@ -20,17 +20,22 @@ import com.tencent.angel.exception.AngelException;
 import com.tencent.angel.ml.math2.matrix.CooLongFloatMatrix;
 import com.tencent.angel.pytorch.Torch;
 import com.tencent.angel.pytorch.model.TorchModelType;
-import org.apache.spark.SparkEnv;
-import scala.Enumeration;
-
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.spark.SparkEnv;
+import scala.Enumeration;
 
 public class TorchModel implements Serializable {
+
+  private static String path;
+  private static BlockingQueue<TorchModel> modelsQueue = new LinkedBlockingQueue<TorchModel>();
+  private static AtomicInteger counter = new AtomicInteger(0);
+  private static int cores = SparkEnv.get().conf()
+          .getInt("spark.executor.cores", 1);
 
   // load library of torch and torch_angel
   static {
@@ -38,28 +43,22 @@ public class TorchModel implements Serializable {
   }
 
   private long ptr = 0;
-  private static String path;
-  private static BlockingQueue<TorchModel> modelsQueue = new LinkedBlockingQueue<TorchModel>();
-  private static AtomicInteger counter = new AtomicInteger(0);
-  private static int cores = SparkEnv.get().conf()
-          .getInt("spark.executor.cores", 1);
 
-  private TorchModel() {}
-
-  private void init(String path) {
-    ptr = Torch.initPtr(path);
+  private TorchModel() {
   }
 
   public static synchronized TorchModel get() throws InterruptedException {
     if (modelsQueue.isEmpty()) {
-      if (path == null)
+      if (path == null) {
         throw new AngelException("Please set path before accessing model");
+      }
       TorchModel model = new TorchModel();
       model.init(path);
       modelsQueue.put(model);
       counter.addAndGet(1);
-      if (counter.get() > cores + 2)
+      if (counter.get() > cores + 2) {
         throw new AngelException("The size of torch model exceeds the cores");
+      }
     }
     return modelsQueue.take();
   }
@@ -70,6 +69,10 @@ public class TorchModel implements Serializable {
 
   public static void setPath(String path) {
     TorchModel.path = path;
+  }
+
+  private void init(String path) {
+    ptr = Torch.initPtr(path);
   }
 
   public String name() {
@@ -86,6 +89,14 @@ public class TorchModel implements Serializable {
 
   public int getInputDim() {
     return Torch.getInputDim(ptr);
+  }
+
+  public int[] getDenseColNums() {
+    return Torch.getDenseColNums(ptr);
+  }
+
+  public int[] getSparseColNums() {
+    return Torch.getSparseColNums(ptr);
   }
 
   public long[] getInputSizes() {
@@ -108,6 +119,18 @@ public class TorchModel implements Serializable {
     return Torch.getParametersTotalSize(ptr);
   }
 
+  public int getUserInputDim() { return Torch.getUserInputDim(ptr); }
+
+  public int getItemInputDim() { return Torch.getItemInputDim(ptr); }
+
+  public int getUserNumFields() { return Torch.getUserNumFields(ptr); }
+
+  public int getItemNumFields() { return Torch.getItemNumFields(ptr); }
+
+  public int getUserEmbeddingDim() { return Torch.getUserEmbeddingDim(ptr); }
+
+  public int getItemEmbeddingDim() { return Torch.getItemEmbeddingDim(ptr); }
+
   public void save(float[] bias, float[] weights, String path) {
     Map<String, Object> params = buildParams(bias, weights);
     params.put("path", path);
@@ -122,7 +145,8 @@ public class TorchModel implements Serializable {
     Torch.save(ptr, params);
   }
 
-  public void save(float[] bias, float[] weights, float[] embeddings, int embeddingDim, int dim, String path) {
+  public void save(float[] bias, float[] weights, float[] embeddings, int embeddingDim, int dim,
+                   String path) {
     Map<String, Object> params = buildParams(bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -131,7 +155,8 @@ public class TorchModel implements Serializable {
     Torch.save(ptr, params);
   }
 
-  public void save(float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, int dim, String path) {
+  public void save(float[] bias, float[] weights, float[] embeddings, int embeddingDim,
+                   float[] mats, int[] matSizes, int dim, String path) {
     Map<String, Object> params = buildParams(bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -142,7 +167,8 @@ public class TorchModel implements Serializable {
     Torch.save(ptr, params);
   }
 
-  public void save(float[] mats, int[] matSizes, float[][] embeddingsArray, int[] embeddingsSize, long[] inputsSizes, String path) {
+  public void save(float[] mats, int[] matSizes, float[][] embeddingsArray, int[] embeddingsSize,
+                   long[] inputsSizes, String path) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("mats", mats);
     params.put("mats_sizes", matSizes);
@@ -169,7 +195,8 @@ public class TorchModel implements Serializable {
     return params;
   }
 
-  private Map<String, Object> buildParams(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights) {
+  private Map<String, Object> buildParams(int batchSize, CooLongFloatMatrix batch, float[] bias,
+                                          float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("index", batch.getRowIndices());
@@ -196,14 +223,16 @@ public class TorchModel implements Serializable {
     return Torch.forward(ptr, params, false);
   }
 
-  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] mats, int[] matSizes) {
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                         float[] mats, int[] matSizes) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("mats", mats);
     params.put("mats_sizes", matSizes);
     return Torch.forward(ptr, params, false);
   }
 
-  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] mats, int[] matSizes, float[][] embeddingsArray, int[] embeddingsSize) {
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] mats, int[] matSizes,
+                         float[][] embeddingsArray, int[] embeddingsSize) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("index", batch.getRowIndices());
@@ -216,14 +245,31 @@ public class TorchModel implements Serializable {
     return Torch.forward(ptr, params, false);
   }
 
-  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim) {
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] mats, int[] matSizes,
+                         float[][] embeddingsArray, int[] embeddingsSize, int multiForwardOut) {
+    Map<String, Object> params = new HashMap<String, Object>();
+    params.put("batch_size", batchSize);
+    params.put("index", batch.getRowIndices());
+    params.put("feats", batch.getColIndices());
+    params.put("values", batch.getValues());
+    params.put("mats", mats);
+    params.put("mats_sizes", matSizes);
+    params.put("embeddings_array", embeddingsArray);
+    params.put("embeddings_sizes", embeddingsSize);
+    params.put("multi_forward_out", multiForwardOut);
+    return Torch.forward(ptr, params, false);
+  }
+
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                         float[] embeddings, int embeddingDim) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
     return Torch.forward(ptr, params, false);
   }
 
-  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes) {
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                         float[] embeddings, int embeddingDim, float[] mats, int[] matSizes) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -232,7 +278,8 @@ public class TorchModel implements Serializable {
     return Torch.forward(ptr, params, false);
   }
 
-  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, long[] fields) {
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                         float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, long[] fields) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -242,13 +289,15 @@ public class TorchModel implements Serializable {
     return Torch.forward(ptr, params, false);
   }
 
-  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] targets) {
+  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                        float[] targets) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("targets", targets);
     return Torch.backward(ptr, params);
   }
 
-  public float backward(int batchSize, CooLongFloatMatrix batch, float[] mats, int[] matSizes, float[][] embeddingsArray, int[] embeddingsSize, float[] targets) {
+  public float backward(int batchSize, CooLongFloatMatrix batch, float[] mats, int[] matSizes,
+                        float[][] embeddingsArray, int[] embeddingsSize, float[] targets) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("index", batch.getRowIndices());
@@ -262,7 +311,8 @@ public class TorchModel implements Serializable {
     return Torch.backward(ptr, params);
   }
 
-  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] targets) {
+  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                        float[] embeddings, int embeddingDim, float[] targets) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -270,7 +320,8 @@ public class TorchModel implements Serializable {
     return Torch.backward(ptr, params);
   }
 
-  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, float[] targets) {
+  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                        float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, float[] targets) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -280,7 +331,9 @@ public class TorchModel implements Serializable {
     return Torch.backward(ptr, params);
   }
 
-  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, long[] fields, float[] targets) {
+  public float backward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights,
+                        float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, long[] fields,
+                        float[] targets) {
     Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
     params.put("embedding", embeddings);
     params.put("embedding_dim", embeddingDim);
@@ -291,21 +344,39 @@ public class TorchModel implements Serializable {
     return Torch.backward(ptr, params);
   }
 
-  //backward for word2vec models
-  public float word2VecBackward(int batchSize, int negSize, float[] srcEmbeddings, float[] dstEmbeddings, float[] negativeEmbeddings, int embeddingDim) {
+  public float[] dssmForward(int batchSize, long[] index, float[] values, float[] mats, int[] matSizes,
+                             float[][] embeddingsArray, int[] embeddingsSize, int[] inputsSizes) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
-    params.put("neg_size", negSize);
-    params.put("srcEmbeddings", srcEmbeddings);
-    params.put("dstEmbeddings", dstEmbeddings);
-    params.put("negativeEmbeddings", negativeEmbeddings);
-    params.put("embedding_dim", embeddingDim);
-    return Torch.word2vecBackward(ptr, params);
+    params.put("index", index);
+    params.put("values", values);
+    params.put("mats", mats);
+    params.put("mats_sizes", matSizes);
+    params.put("embeddings_array", embeddingsArray);
+    params.put("embeddings_sizes", embeddingsSize);
+    params.put("inputs_sizes", inputsSizes);
+    return Torch.dssmForward(ptr, params);
+  }
+
+  public float dssmBackward(int batchSize, long[] index, float[] values, float[] mats, int[] matSizes,
+                            float[][] embeddingsArray, int[] embeddingsSize, int[] inputsSizes, float[] targets) {
+    Map<String, Object> params = new HashMap<String, Object>();
+    params.put("batch_size", batchSize);
+    params.put("index", index);
+    params.put("values", values);
+    params.put("mats", mats);
+    params.put("mats_sizes", matSizes);
+    params.put("embeddings_array", embeddingsArray);
+    params.put("embeddings_sizes", embeddingsSize);
+    params.put("inputs_sizes", inputsSizes);
+    params.put("targets", targets);
+    return Torch.dssmBackward(ptr, params);
   }
 
   /* forward/backward/predict for gcn models */
 
-  public float[] gcnForward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+  public float[] gcnForward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
+                            long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("x", x);
@@ -324,7 +395,8 @@ public class TorchModel implements Serializable {
     return (float[]) Torch.gcnExecMethod(ptr, "embedding_predict_", params);
   }
 
-  public long[] gcnPredict(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+  public long[] gcnPredict(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
+                           long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("x", x);
@@ -339,7 +411,8 @@ public class TorchModel implements Serializable {
     return Torch.gcnExecMethod(ptr, "predict_", params);
   }
 
-  public float gcnBackward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights, long[] targets) {
+  public float gcnBackward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
+                           long[] secondEdgeIndex, float[] weights, long[] targets) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("x", x);
@@ -348,22 +421,24 @@ public class TorchModel implements Serializable {
     params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
     params.put("targets", targets);
-    return Torch.gcnBackward(ptr, params);
+    return Torch.gcnBackward(ptr, params, false);
   }
 
-  public float gcnBackward(Map<String, Object> params) {
-    return Torch.gcnBackward(ptr, params);
+  public float gcnBackward(Map<String, Object> params, boolean sparse) {
+    return Torch.gcnBackward(ptr, params, sparse);
   }
 
-  public float[] gcnEmbedding(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+  public float[] gcnEmbedding(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
+                              long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("x", x);
     params.put("feature_dim", featureDim);
     params.put("first_edge_index", firstEdgeIndex);
     params.put("weights", weights);
-    if (secondEdgeIndex != null)
+    if (secondEdgeIndex != null) {
       params.put("second_edge_index", secondEdgeIndex);
+    }
     return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params);
   }
 
@@ -371,7 +446,12 @@ public class TorchModel implements Serializable {
     return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params);
   }
 
-  public float dgiBackward(int batchSize, float[] pos_x, float[] neg_x, int featureDim, long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
+  public float[] gcnBiEmbedding(Map<String, Object> params, String method) {
+    return (float[]) Torch.gcnExecMethod(ptr, method, params);
+  }
+
+  public float dgiBackward(int batchSize, float[] pos_x, float[] neg_x, int featureDim,
+                           long[] firstEdgeIndex, long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("batch_size", batchSize);
     params.put("pos_x", pos_x);
@@ -379,13 +459,18 @@ public class TorchModel implements Serializable {
     params.put("feature_dim", featureDim);
     params.put("first_edge_index", firstEdgeIndex);
     params.put("weights", weights);
-    if (secondEdgeIndex != null)
+    if (secondEdgeIndex != null) {
       params.put("second_edge_index", secondEdgeIndex);
-    return Torch.gcnBackward(ptr, params);
+    }
+    return Torch.gcnBackward(ptr, params, false);
   }
 
   public float[] getParameters() {
     return Torch.getParameters(ptr);
+  }
+
+  public float[] getMatsParameters() {
+    return Torch.getMatsParameters(ptr);
   }
 
   public void gcnSave(String path, float[] weights) {
@@ -400,18 +485,19 @@ public class TorchModel implements Serializable {
   public String toString() {
     Enumeration.Value type = TorchModelType.withName(getType());
     StringBuilder builder = new StringBuilder();
-    builder.append("type: " + getType() + " ");
-    builder.append("name:" + name() + " ");
+    builder.append("type: ").append(getType()).append(" ");
+    builder.append("name:").append(name()).append(" ");
     if (type == TorchModelType.BIAS_WEIGHT()) {
-      builder.append("input_dim: " + getInputDim() + " ");
+      builder.append("input_dim: ").append(getInputDim()).append(" ");
     } else if (type == TorchModelType.BIAS_WEIGHT_EMBEDDING()) {
-      builder.append("embedding_dim: " + getEmbeddingDim() + " ");
+      builder.append("embedding_dim: ").append(getEmbeddingDim()).append(" ");
     } else if (type == TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS()
             || type == TorchModelType.BIAS_WEIGHT_EMBEDDING_MATS_FIELD()) {
       builder.append("mats_dims: ");
       int[] sizes = getMatsSize();
-      for (int i = 0; i < sizes.length - 1; i++)
+      for (int i = 0; i < sizes.length - 1; i++) {
         builder.append(sizes[i] + ",");
+      }
       builder.append(sizes[sizes.length - 1]);
     }
     return builder.toString();

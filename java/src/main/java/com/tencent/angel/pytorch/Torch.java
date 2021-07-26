@@ -76,9 +76,6 @@ public class Torch {
 
   public static native float dssmBackward(long ptr, Map<String, Object> params);
 
-  /* word2vec backward */
-  public static native float word2vecBackward(long ptr, Map<String, Object> params);
-
   /* graph backward */
   public static native float gcnBackward(long ptr, Map<String, Object> params, boolean sparse);
 
@@ -95,8 +92,4 @@ public class Torch {
   public static native void setParameters(long ptr, float[] values);
 
   public static native void gcnSave(long ptr, Map<String, Object> params);
-
-  /* feature importance */
-  public static native float[] importance(long ptr, Map<String, Object> params);
-
 }
