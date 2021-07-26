@@ -17,7 +17,6 @@
 package com.tencent.angel.pytorch.optim
 
 import java.util.concurrent.Future
-
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
@@ -52,7 +51,22 @@ abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
 
   def getCurrentEta: Double = eta / (1 + (numSteps - 1) * decay)
 
+  def getType: Int = -1 /* Optimization Method Indicator：0 for SGD, 1 for Momentum, 2 for Adagrad, 3 for Adam */
+
   override def toString: String = {
     s"eta=$eta decay=$decay"
   }
+
+  def getMomentum: Float = 0.9f
+
+  def getBeta: Float = 0.9f
+
+  def getGamma: Float = 0.99f
+
+  def getFactor: Float = 0.9f
+
+  def getEpsilon: Float = 1.0E-8f
+
+  def addStep: Unit = numSteps+=1
+
 }
