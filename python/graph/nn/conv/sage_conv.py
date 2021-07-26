@@ -126,8 +126,9 @@ class SAGEConv3(torch.jit.ScriptModule):
     the inner-nodes and first-order nodes. Thus, we can reduce some calculation.
     """
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, act=False):
         super(SAGEConv3, self).__init__()
+        self.act = act
 
         self.weight = Parameter(torch.Tensor(in_channels * 2, out_channels))
         self.bias = Parameter(torch.zeros(out_channels))
@@ -148,6 +149,8 @@ class SAGEConv3(torch.jit.ScriptModule):
         x = torch.cat([x, out], dim=1)
         out = torch.matmul(x, self.weight)
         out = out + self.bias
+        if self.act:
+            out = F.relu(out)
         out = F.normalize(out, p=2.0, dim=-1)
         return out
 
