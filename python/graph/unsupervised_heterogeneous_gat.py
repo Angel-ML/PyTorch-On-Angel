@@ -146,7 +146,7 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
         # type: (Tensor, Tensor, Tensor, Tensor, str) -> Tensor
 
         # gat conv encode
-        graph_user_emb = self.encode(u, i, first_u_edge_index, first_i_edge_index, conv)
+        graph_user_emb = self.encode_conv(u, i, first_u_edge_index, first_i_edge_index, conv)
 
         user_emb = torch.cat([u[0: graph_user_emb.size(0)], graph_user_emb], dim=1)
 
@@ -162,7 +162,7 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
         return user_emb
 
     @torch.jit.script_method
-    def encode(self, u, i, first_edge_index, second_edge_index, conv):
+    def encode_conv(self, u, i, first_edge_index, second_edge_index, conv):
         # type: (Tensor, Tensor, Tensor, Tensor, str) -> Tensor
 
         # convs = self.convs_u
