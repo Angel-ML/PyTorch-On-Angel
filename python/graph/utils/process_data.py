@@ -15,7 +15,7 @@
 import torch
 
 
-@torch.jit.script_method
+@torch.jit.script
 def parse_feat(x, batch_ids, field_ids, field_num, encode):
     # type: (Tensor, Tensor, Tensor, int, str) -> Tensor
     k = x.size(1)# embedding_dim
