@@ -183,7 +183,7 @@ class GNNPSModel(graph: PSMatrix,
     for (i <- batchNeighbors.indices) {
       neighbors(i) = new LongNeighbor(batchNeighbors(i))
     }
-    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys, neighbors))
+    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys.clone(), neighbors))
     graph.asyncPsfUpdate(func).get()
     println(s"init ${batchKeys.length} neighbors")
 
@@ -191,7 +191,7 @@ class GNNPSModel(graph: PSMatrix,
     for (i <- batchTypes.indices) {
       types(i) = new NodeType(batchTypes(i))
     }
-    val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys, types))
+    val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys.clone(), types))
     graph.asyncPsfUpdate(nodeFunc).get()
     println(s"init ${batchKeys.length} node types")
   }
