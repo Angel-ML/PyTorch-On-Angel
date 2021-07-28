@@ -68,7 +68,7 @@ object HANExample {
     val validatePeriods = params.getOrElse("validatePeriods", "1").toInt
     val saveCheckpoint = params.getOrElse("saveCheckpoint", "false").toBoolean
     val hasNodeType = params.getOrElse("hasNodeType", "true").toBoolean
-    val itemTypes = params.getOrElse("temTypes", "266").toInt
+    val itemTypes = params.getOrElse("itemTypes", "266").toInt
     val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
     val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
     // sep for reading edges
