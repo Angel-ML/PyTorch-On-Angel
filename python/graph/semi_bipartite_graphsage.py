@@ -97,7 +97,7 @@ class SupervisedBiSAGE(torch.jit.ScriptModule):
             u = parse_feat(u, u_batch_ids, u_field_ids, self.user_field_num, self.encode)
             i = parse_feat(i, i_batch_ids, i_field_ids, self.item_field_num, self.encode)
 
-        if second_u_edge_index != torch.Tensor([]):
+        if second_u_edge_index.size(0) == 0:
             neigh_u_second = self.u_layer2(u, i, second_u_edge_index)
             neigh_i = self.i_layer1(i, neigh_u_second, first_i_edge_index)
             neigh_u = self.u_layer1(neigh_u_second, neigh_i, first_u_edge_index)

@@ -16,22 +16,22 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
-import com.tencent.angel.graph.data.Node
+import com.tencent.angel.graph.data.GraphNode
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.{MatrixContext, RowType}
 import com.tencent.angel.ml.matrix.psf.update.XavierUniform
 import com.tencent.angel.model.{MatrixLoadContext, MatrixSaveContext, ModelLoadContext, ModelSaveContext}
 import com.tencent.angel.model.output.format.TextColumnFormat
 import com.tencent.angel.ps.storage.partitioner.ColumnRangePartitioner
-import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.utils.CheckpointUtils
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.util.LoadBalancePartitioner
-import com.tencent.angel.spark.models.impl.{PSMatrixImpl, PSVectorImpl}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 import org.apache.spark.rdd.RDD
-import java.util.{ArrayList => JArrayList}
+import com.tencent.angel.graph.common.param.ModelContext
+import com.tencent.angel.graph.utils.ModelContextUtils
+import org.apache.spark.SparkContext
 
 class SparseGNNPSModel(graph: PSMatrix,
                        weights: PSVector,
@@ -92,53 +92,44 @@ object SparseGNNPSModel {
   def apply(minId: Long, maxId: Long, weightSize: Int, optim: AsyncOptim,
             index: RDD[Long], psNumPartition: Int,
             useBalancePartition: Boolean, featEmbedDim: Int, featureDim: Int): GNNPSModel = {
-    var maxColBlock = if ((maxId - minId) > psNumPartition) (maxId - minId) / psNumPartition else 10
-    val graph = new MatrixContext("graph", 1, minId, maxId)
-    graph.setRowType(RowType.T_ANY_LONGKEY_SPARSE)
-    graph.setMaxColNumInBlock(maxColBlock)
-    graph.setValueType(classOf[Node])
+    val userNumNode = index.distinct().count()
+    //create user graph matrix context
+    val graphModelContext = new ModelContext(psNumPartition, minId, maxId, userNumNode, "graph",
+      SparkContext.getOrCreate().hadoopConfiguration)
+    val graphMatrixContext = ModelContextUtils.createMatrixContext(graphModelContext,
+      RowType.T_ANY_LONGKEY_SPARSE, classOf[GraphNode])
 
-    val labels = new MatrixContext("labels", 1, minId, maxId)
-    labels.setRowType(RowType.T_FLOAT_SPARSE_LONGKEY)
-    labels.setMaxColNumInBlock(maxColBlock)
+    // create labels matrix context
+    val labelsModelContext = new ModelContext(psNumPartition, minId, maxId, userNumNode, "labels",
+      SparkContext.getOrCreate().hadoopConfiguration)
+    val labelsMatrixContext = ModelContextUtils.createMatrixContext(labelsModelContext, RowType.T_FLOAT_SPARSE_LONGKEY)
 
-    val testLabels = new MatrixContext("testLabels", 1, minId, maxId)
-    testLabels.setRowType(RowType.T_FLOAT_SPARSE_LONGKEY)
-    testLabels.setMaxColNumInBlock(maxColBlock)
+    // create testLabels matrix context
+    val testLabelsModelContext = new ModelContext(psNumPartition, minId, maxId, userNumNode,
+      "testLabels", SparkContext.getOrCreate().hadoopConfiguration)
+    val testLabelsMatrixContext = ModelContextUtils.createMatrixContext(testLabelsModelContext, RowType.T_FLOAT_SPARSE_LONGKEY)
 
-    if (useBalancePartition)
-      LoadBalancePartitioner.partition(index, psNumPartition, graph)
+    if (!graphModelContext.isUseHashPartition && useBalancePartition)
+      LoadBalancePartitioner.partition(index, psNumPartition, graphMatrixContext)
 
-    maxColBlock = if (weightSize > psNumPartition) weightSize / psNumPartition else 10
+    // create weights matrix context
     val weights = new MatrixContext("weights", optim.getNumSlots(), weightSize)
     weights.setRowType(RowType.T_FLOAT_DENSE)
     weights.setPartitionerClass(classOf[ColumnRangePartitioner])
-    weights.setMaxColNumInBlock(maxColBlock)
 
+    // create user embedding matrix context
     val embedding = new MatrixContext("embedding",
       featEmbedDim * optim.getNumSlots(), featureDim)
     embedding.setRowType(RowType.T_FLOAT_DENSE)
     embedding.setPartitionerClass(classOf[ColumnRangePartitioner])
 
-    val list = new JArrayList[MatrixContext]()
-    list.add(graph)
-    list.add(weights)
-    list.add(labels)
-    list.add(testLabels)
-    list.add(embedding)
+    // create matrix
+    val graph = PSMatrix.matrix(graphMatrixContext)
+    val weightsVec = PSVector.vector(weights)
+    val labels = PSVector.vector(labelsMatrixContext)
+    val testLabels = PSVector.vector(testLabelsMatrixContext)
+    val embeddingMatrix = PSMatrix.matrix(embedding)
 
-    PSAgentContext.get().getMasterClient.createMatrices(list, 10000L)
-    val graphId = PSAgentContext.get().getMasterClient.getMatrix("graph").getId
-    val weightsId = PSAgentContext.get().getMasterClient.getMatrix("weights").getId
-    val labelsId = PSAgentContext.get().getMasterClient.getMatrix("labels").getId
-    val testLabelsId = PSAgentContext.get().getMasterClient.getMatrix("testLabels").getId
-    val embeddingId = PSAgentContext.get().getMasterClient.getMatrix("embedding").getId
-
-    new SparseGNNPSModel(new PSMatrixImpl(graphId, 1, maxId, graph.getRowType),
-      new PSVectorImpl(weightsId, 0, weights.getColNum, weights.getRowType),
-      new PSVectorImpl(labelsId, 0, maxId, labels.getRowType),
-      new PSVectorImpl(testLabelsId, 0, maxId, testLabels.getRowType),
-      new PSMatrixImpl(embeddingId, embedding.getRowNum, embedding.getColNum, embedding.getRowType),
-      featEmbedDim)
+    new SparseGNNPSModel(graph, weightsVec, labels, testLabels, embeddingMatrix, featEmbedDim)
   }
 }

@@ -80,8 +80,8 @@ class EdgePropSAGETwoSoftmax(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def embedding_predict_(self, embedding):
-        out = torch.matmul(embedding, self.weight3)
-        out = out + self.bias3
+        out = torch.matmul(embedding, self.weight)
+        out = out + self.bias
         if self.task_type == "classification":
             return F.log_softmax(out, dim=1)
         else:

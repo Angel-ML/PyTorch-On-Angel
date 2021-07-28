@@ -17,6 +17,7 @@ from .loop import remove_self_loops, add_self_loops
 from .scatter import scatter_add, scatter_mean
 from .inits import glorot, zeros, uniform
 from .process_data import parse_feat
+from .softmax import softmax
 from .sparse import spmm
 
 
@@ -31,5 +32,6 @@ __all__ = [
     'zeros',
     'uniform',
     'spmm',
-    'parse_feat'
+    'parse_feat',
+    'softmax'
 ]

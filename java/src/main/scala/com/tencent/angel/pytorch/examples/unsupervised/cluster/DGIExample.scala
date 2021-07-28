@@ -108,7 +108,8 @@ object DGIExample {
 
     val (model, graph) = dgi.initialize(edges, features)
     dgi.showSummary(model, graph)
-    dgi.fit(model, graph)
+    if (actionType == "train")
+      dgi.fit(model, graph)
 
     if (embeddingPath.length > 0) {
       val embedding = dgi.genEmbedding(model, graph)

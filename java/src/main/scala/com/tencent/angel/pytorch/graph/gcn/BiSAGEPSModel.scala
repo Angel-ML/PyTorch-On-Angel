@@ -156,7 +156,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
     for (i <- batchNeighbors.indices) {
       neighbors(i) = new LongNeighbor(batchNeighbors(i))
     }
-    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys, neighbors))
+    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys.clone(), neighbors))
     graph.asyncPsfUpdate(func).get()
     println(s"init ${batchKeys.length} neighbors")
     if (hasNodeType) {
@@ -164,7 +164,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
       for (i <- batchTypes.indices) {
         nodeTypes(i) = new NodeType(batchTypes(i))
       }
-      val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys, nodeTypes))
+      val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys.clone(), nodeTypes))
       graph.asyncPsfUpdate(nodeFunc).get()
       println(s"init ${batchKeys.length} node types")
     } else {
@@ -172,7 +172,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
       for (i <- batchTypes.indices) {
         edgeTypes(i) = new EdgeType(batchTypes(i))
       }
-      val edgeFunc = new InitEdgeTypes(new GeneralInitParam(graph.id, batchKeys, edgeTypes))
+      val edgeFunc = new InitEdgeTypes(new GeneralInitParam(graph.id, batchKeys.clone(), edgeTypes))
       graph.asyncPsfUpdate(edgeFunc).get()
       println(s"init ${batchKeys.length} edge types")
     }
@@ -188,7 +188,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
     for (i <- batchNeighbors.indices) {
       neighbors(i) = new LongNeighbor(batchNeighbors(i))
     }
-    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys, neighbors))
+    val func = new InitNeighbor(new GeneralInitParam(graph.id, batchKeys.clone(), neighbors))
     graph.asyncPsfUpdate(func).get()
     println(s"init ${batchKeys.length} neighbors")
 
@@ -196,7 +196,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
     for (i <- batchNodeTypes.indices) {
       nodeTypes(i) = new NodeType(batchNodeTypes(i))
     }
-    val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys, nodeTypes))
+    val nodeFunc = new InitNodeTypes(new GeneralInitParam(graph.id, batchKeys.clone(), nodeTypes))
     graph.asyncPsfUpdate(nodeFunc).get()
     println(s"init ${batchKeys.length} node types")
 
@@ -204,7 +204,7 @@ class BiSAGEPSModel(userGraph: PSMatrix,
     for (i <- batchEdgeTypes.indices) {
       edgeTypes(i) = new EdgeType(batchEdgeTypes(i))
     }
-    val edgeFunc = new InitEdgeTypes(new GeneralInitParam(graph.id, batchKeys, edgeTypes))
+    val edgeFunc = new InitEdgeTypes(new GeneralInitParam(graph.id, batchKeys.clone(), edgeTypes))
     graph.asyncPsfUpdate(edgeFunc).get()
     println(s"init ${batchKeys.length} edge types")
   }

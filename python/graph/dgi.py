@@ -70,11 +70,11 @@ class DGI(torch.jit.ScriptModule):
     @torch.jit.script_method
     def embedding_(self, x, first_edge_index, second_edge_index=torch.Tensor([])):
         r"""Generates learned representation of the input nodes."""
-        if second_edge_index == torch.Tensor([]):
+        if second_edge_index.size(0) == 0:
+            x = F.prelu(self.gcn(x, first_edge_index), self.prelu2)
+        else:
             x = F.prelu(self.gcn1(x, second_edge_index), self.prelu1)
             x = F.prelu(self.gcn2(x, first_edge_index), self.prelu2)
-        else:
-            x = F.prelu(self.gcn(x, first_edge_index), self.prelu2)
         return x
 
 

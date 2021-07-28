@@ -430,6 +430,110 @@ Here we give an example of using EdgeProp over pytorch on angel.
     **Notes:**
     - The model file, rgcn_mutag.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
 
+### Example of HAN 
+
+[HAN](https://arxiv.org/pdf/1903.07293.pdf) is a semi-supervised graph convolution network for heterogeneous graph.  In order to capture the heterogeneous information, HAN defined two different attentions: node-level and semantic level. Here a simplified version of HAN is implemented, which accepts bipartite graph in the form of "user-item", where item nodes could have multiple types. In another words, the input graph has multiple meta-paths in the form of "user-item-user".
+HAN classifies user nodes, and outputs their embeddings if needed.
+
+
+Here we give an example of using HAN over pytorch on angel.
+
+
+1. **Generate pytorch sciprt model**
+    First, go to directory of python/graph and execute the following command:
+    ```$xslt
+    python semi_han.py --m 64 --input_dim 32 --hidden_dim 16 --output_dim 2 --item_types 5  --output_file han.pt
+    ```
+    This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of han. After that, you will obtain a model file named "han.pt". 
+
+2. **Preparing input data**
+    There are three inputs required for han, including the edge table, the feature table and the label table.
+
+    HAN requires an edge file which contains three columns including the source node column, the destination column and the node type column. The third column indicates the destination nodes' types, each type indicates a meta-path of "A-B-A". For example:
+	```
+	src dst type
+	```
+	The src and dst is a Long numeric while the type is an Integer numeric.
+
+    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
+
+    For sparse format, each line is formated as follows:
+    ```
+    node\tf1:v1 f2:v2 f3:v3
+    ```
+    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
+
+    For dense format, it is:
+    ```
+    node\tv1 v2 v3
+    ```
+
+    The label table contains a set of node-label pairs. Since han is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
+
+    Note that, each node contained in the edge table should has a feature line in the feature table file.
+
+2. **Submit model to cluster**
+    After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
+    ```$xslt
+    source ./spark-on-angel-env.sh  
+   $SPARK_HOME/bin/spark-submit \
+          --master yarn-cluster\
+          --conf spark.ps.instances=5 \
+          --conf spark.ps.cores=1 \
+          --conf spark.ps.jars=$SONA_ANGEL_JARS \
+          --conf spark.ps.memory=5g \
+          --conf spark.ps.log.level=INFO \
+          --conf spark.driver.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
+          --conf spark.executor.extraJavaOptions=-Djava.library.path=$JAVA_LIBRARY_PATH:.:./torch/angel_libtorch \
+          --conf spark.executor.extraLibraryPath=./torch/angel_libtorch \
+          --conf spark.driver.extraLibraryPath=./torch/angel_libtorch \
+          --conf spark.executorEnv.OMP_NUM_THREADS=2 \
+          --conf spark.executorEnv.MKL_NUM_THREADS=2 \
+          --queue $queue \
+          --name "rgcn-angel" \
+          --jars $SONA_SPARK_JARS  \
+          --archives angel_libtorch.zip#torch\  #path to c++ library files
+          --files rgcn_mutag.pt \   #path to pytorch script model
+          --driver-memory 5g \
+          --num-executors 5 \
+          --executor-cores 1 \
+          --executor-memory 5g \
+          --class com.tencent.angel.pytorch.example.supervised.HANExample \
+          ./pytorch-on-angel-${VERSION}.jar \   # jar from Compiling java submodule
+          edgePath:$edgePath userFeaturePath:$featurePath labelPath:$labelPath\
+          torchModelPath:han.pt featureDim:32 userFeatureDim:32 temTypes:5 stepSize:0.01\
+          optimizer:adam numEpoch:10 testRatio:0.5\
+          numPartitions:50 format:sparse samples:10 batchSize:128\
+          predictOutputPath:$predictOutputPath embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
+          actionType:train numBatchInit:5
+    ```
+    Here we give a short description for the parameters in the submit script. 
+
+    - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
+    - userFeaturePath: the input path (hdfs) of feature table
+    - labelPath: the input path (hdfs) of label table
+    - torchModelPath: the name of the model file, graphsage_cora.pt in this example
+    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
+    - itemTypes: types of item nodes, which is also the num of meta-paths
+    - stepSize: the learning rate when training
+    - optimizer: adam/momentum/sgd/adagrad
+    - numEpoch: number of epoches you want to run 
+    - testRatio: use how many nodes from the label file for testing
+    - numPartitions: partition the data into how many partitions
+    - format: should be sparse/dense
+    - samples: the number of samples when sampling neighbors in rgcn
+    - batchSize: batch size for each optimizing step
+    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
+    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
+    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
+    - actionType: should be train/predict
+    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step. 
+
+    **Notes:**
+    - The model file, rgcn_mutag.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
+
+
+
 
 ### Example of GAT
 

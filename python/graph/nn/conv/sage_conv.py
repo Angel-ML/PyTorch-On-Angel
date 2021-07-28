@@ -207,7 +207,7 @@ class EdgeSAGEConv(torch.jit.ScriptModule):
     """
 
     def __init__(self, in_channels, edge_channels, out_channels, act=False):
-        super(SAGEConv3, self).__init__()
+        super(EdgeSAGEConv, self).__init__()
         self.act = act
 
         self.weight = Parameter(torch.Tensor(in_channels * 2 + edge_channels, out_channels))
@@ -222,7 +222,7 @@ class EdgeSAGEConv(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def forward(self, x, edge, edge_index):
-        # type: (Tensor, Tensor) -> Tensor
+        # type: (Tensor, Tensor, Tensor) -> Tensor
         row, col = edge_index[0], edge_index[1]
         e_out = scatter_mean(edge[col], row, dim=0)
         out = scatter_mean(x[col], row, dim=0)
