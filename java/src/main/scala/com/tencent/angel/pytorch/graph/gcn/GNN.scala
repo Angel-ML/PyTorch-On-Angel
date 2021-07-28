@@ -101,7 +101,7 @@ class GNN(val uid: String) extends Serializable
 
     // correct featureDim for sparse input after initFeatures
     if ($(fieldNum) > 0) {
-      setFeatureDim($(featEmbedDim) * $(fieldNum))
+      setFeatureDim($(featEmbedDim))
     }
     TorchModel.put(torch)
 
