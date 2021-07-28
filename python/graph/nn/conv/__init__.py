@@ -21,6 +21,7 @@ from .igmc_conv import IGMCConv
 from .hgat_conv import HGATConv
 from .rgcn_conv import RGCNConv
 from .han_conv import HANConv
+from .gat_conv import GATConv
 
 __all__ = [
     'GCNConv',
@@ -35,4 +36,5 @@ __all__ = [
     'BiSAGEConv',
     'HGATConv',
     'HANConv',
+    'GATConv'
 ]
