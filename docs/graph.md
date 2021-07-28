@@ -30,10 +30,20 @@ Pytorch on Angel provides the ability to run graph convolution network algorithm
 
 - Spark Executor Resource: the configuration of Spark resources is mainly considered from the aspect of training data(Edge data is usually saved on Spark Executor), and it is best to save 2 times the input data. If the memory is tight, 1x is acceptable, but it will be relatively slow. For example, a 10 billion edge set is about 200G in size, and a 30G * 20 configuration is sufficient. 
 
-##### High-Sparse data
+##### High-Sparse data(data has field)
+Resources of Angel PS and Spark Executor is similar to Dense data, the only difference is that there is low-dimention embedding matrix for high-sparse data.
+low-dimention embedding: input_embedding_dim * slots * input_dim * 4Byte
+- input_embedding_dim: the dimention of embedding, which is usually low, such as:8; (As for Bipartite GNN or Heterogeneous GNN, the parameter is input_user_embedding_dim or input_item_embedding_dim)
+- slots: related to the optimizer, the default optimizer adam, slots = 3
+- input_dim: the dim of input feature; (As for Bipartite GNN or Heterogeneous GNN, the parameter is input_user_dim or input_item_dim, which is the dim of user's feature or item's feature)
+- input_field_num: the number of features with value; (As for Bipartite GNN or Heterogeneous GNN, the parameter is input_user_field_num or input_item_field_num, which is the number of user's feature with value or item's feature with value)
 
+Angel PS Resource:in order to ensure that Angel does not hang up, it is necessary to configure memory that is about twice the size of the model.
+	- `GraphSage`: edge, node feature, node label, embedding matrix, the model size is: (edge_num * 2 * 8Byte + node_num * `field_num` * 4Byte + the num of node with label * 4Byte + `input_embedding_dim * slots * input_dim * 4Byte`)
+	- `Semi Bipartite GraphSage`: edge * 2, user feature, item feature, user label, user embedding matrix, item embedding matrix, the model size is: (edge_num * 2 * 8Byte * 2 + user_num * `user_field_num` * 4Byte + item_num * `item_field_num` * 4Byte + user_label_num * 4Byte+ `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
+	- `HGAT`: edge * 2, user feature, item feature, user label, user embedding matrix, item embedding matrix, the model size is: (edge_num * 2 * 8Byte * 2 + user_num * `user_field_num` * 4Byte + item_num * `item_field_num` * 4Byte + user_label_num * 4Byte+ `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
 
-
+Spark Executor Resource:the configuration of Spark resources is mainly considered from the aspect of training data(Edge data is usually saved on Spark Executor), and it is best to save 2 times the input data. If the memory is tight, 1x is acceptable, but it will be relatively slow. For example, a 10 billion edge set is about 200G in size, and a 30G * 20 configuration is sufficient. 
 
 
 ### Example of GraphSage
