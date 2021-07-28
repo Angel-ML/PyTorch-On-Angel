@@ -5,11 +5,16 @@ set(CMAKE_CXX_STANDARD 14)
 
 #set libtorch path
 #set(TORCH_HOME "/path/to/libtorch")
-#set(TORCH_HOME $ENV{TORCH_HOME})
-set(TORCH_HOME "/Users/ouyangwen/software/libtorch-1.3/libtorch")
+set(TORCH_HOME $ENV{TORCH_HOME})
 set(CMAKE_PREFIX_PATH ${TORCH_HOME})
 
-find_package(Torch REQUIRED)
+find_package(Torch 1.4.0 REQUIRED)
+if (TORCH_FOUND)
+    if(Torch_VERSION STRGREATER_EQUAL 1.4.0)
+        add_definitions(-DLIBTORCH_VERSION_LATEST)
+    endif()
+    message("-- FOUND TORCH VERSION : ${Torch_VERSION}")
+endif (TORCH_FOUND)
 find_package(JNI REQUIRED)
 
 include_directories(${JAVA_INCLUDE_PATH})
@@ -30,6 +35,7 @@ set(PYTORCH_SRC
         src/angel/pytorch/angel_torch.cc
         src/angel/pytorch/utils.cc
         src/angel/map.cc src/angel/pytorch/model.cc)
-
+add_subdirectory(pytorch_scatter-2.0.5)
 add_library(torch_angel SHARED ${PYTORCH_SRC} ${PYTORCH_HEADER})
 target_link_libraries(torch_angel ${TORCH_LIBRARIES})
+target_link_libraries(torch_angel -Wl,--no-as-needed torchscatter)
