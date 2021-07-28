@@ -70,7 +70,7 @@ class HAN extends GCN with HasNodeType with HasUserFeatureDim {
   override
   def genEmbedding(model: GNNPSModel, graph: Dataset[_]): DataFrame = {
     val ret = graph.rdd.flatMap(_.asInstanceOf[HANPartition]
-      .genEmbedding($(batchSize) * $(batchSizeMultiple), model, $(userFeatureDim), $(numSamples),
+      .genEmbedding($(batchSize) * $(batchSizeMultiple), model, $(featureDim), $(numSamples),
         graph.rdd.getNumPartitions, false, $(fieldNum), $(fieldMultiHot)))
       .map(f => Row.fromSeq(Seq[Any](f._1, f._2)))
 
@@ -84,7 +84,7 @@ class HAN extends GCN with HasNodeType with HasUserFeatureDim {
 
   override def genLabelsEmbedding(model: GNNPSModel, graph: Dataset[_]): DataFrame = {
     val ret = graph.rdd.flatMap(_.asInstanceOf[HANPartition]
-      .genLabelsEmbedding($(batchSize) * $(batchSizeMultiple), model,  $(userFeatureDim), $(numSamples),
+      .genLabelsEmbedding($(batchSize) * $(batchSizeMultiple), model,  $(featureDim), $(numSamples),
         graph.rdd.getNumPartitions, $(numLabels), false, $(fieldNum), $(fieldMultiHot)))
       .map(f => Row.fromSeq(Seq[Any](f._1, f._2, f._3, f._4)))
 
