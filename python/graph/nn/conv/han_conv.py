@@ -33,6 +33,8 @@ class HANConv(torch.jit.ScriptModule):
         self.weight = Parameter(torch.zeros(m, hidden))
         self.bias = Parameter(torch.zeros(hidden))
 
+        self.item_types = item_types
+
         self.reset_parameters()
 
     def reset_parameters(self):

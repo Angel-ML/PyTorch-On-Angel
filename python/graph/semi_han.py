@@ -26,7 +26,7 @@ from utils import parse_feat
 
 class HAN(torch.jit.ScriptModule):
 
-    def __init__(self, in_dim, m, embedding_dim, item_types, hidden, out_dim,
+    def __init__(self, in_dim, m, item_types, hidden, out_dim,
         task_type, input_embedding_dim, field_num, encode):
         super(HAN, self).__init__()
         # loss func for multi label classification
@@ -43,7 +43,7 @@ class HAN(torch.jit.ScriptModule):
 
         self.conv = HANConv(in_dim, m, item_types, hidden)
 
-        self.weight = Parameter(torch.zeros(embedding_dim, out_dim))
+        self.weight = Parameter(torch.zeros(m, out_dim))
         self.bias = Parameter(torch.zeros(out_dim))
 
         self.reset_parameters()
@@ -104,7 +104,7 @@ FLAGS = None
 
 
 def main():
-    han = HAN(FLAGS.input_dim, FLAGS.m, FLAGS.embedding_dim, FLAGS.item_types,
+    han = HAN(FLAGS.input_dim, FLAGS.m, FLAGS.item_types,
               FLAGS.hidden_dim, FLAGS.output_dim, FLAGS.task_type,
               FLAGS.input_embedding_dim, FLAGS.input_field_num, FLAGS.encode)
 
@@ -117,12 +117,7 @@ if __name__ == '__main__':
         "--m",
         type=int,
         default=-1,
-        help="input dimension of m")
-    parser.add_argument(
-        "--embedding_dim",
-        type=int,
-        default=-1,
-        help="final embedding dimension of m")
+        help="dimension of transform matrix")
     parser.add_argument(
         "--input_dim",
         type=int,
