@@ -207,7 +207,7 @@ object ESMMExample {
           test_scores.unpersist(blocking = false)
         }
         val epochTime = System.currentTimeMillis() - epochStartTime
-        print(s"time=${epochTime.toFloat / 1000}s")
+        print(s" time=${epochTime.toFloat / 1000}s")
         println()
         optim.step(maxBatch.toInt)
       }
