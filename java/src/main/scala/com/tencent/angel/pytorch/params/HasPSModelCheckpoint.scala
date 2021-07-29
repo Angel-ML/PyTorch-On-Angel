@@ -16,16 +16,16 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{IntParam, Params}
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
 trait HasPSModelCheckpoint extends Params {
 
-  final val checkpointInterval = new IntParam(this, "checkpointInterval", "checkpointInterval")
+  final val saveCheckpoint = new BooleanParam(this, "saveCheckpoint", "saveCheckpoint")
 
-  setDefault(checkpointInterval, Int.MaxValue)
+  setDefault(saveCheckpoint, false)
 
-  final def getCheckpointInterval: Int = $(checkpointInterval)
+  final def getSaveCheckpoint: Boolean = $(saveCheckpoint)
 
-  final def setCheckpointInterval(value: Int): this.type = set(checkpointInterval, value)
+  final def setSaveCheckpoint(value: Boolean): this.type = set(saveCheckpoint, value)
 
 }

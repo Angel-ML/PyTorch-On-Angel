@@ -12,10 +12,10 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 #
+# !/usr/bin/env python
 
 from __future__ import print_function
 import argparse
-
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
@@ -23,12 +23,15 @@ from nn.conv import SAGEConv3
 
 
 class DGI(torch.jit.ScriptModule):
-    def __init__(self, n_in, n_h):
+
+    def __init__(self, n_in, n_h1, n_h2):
         super(DGI, self).__init__()
-        self.n_h = n_h
-        self.gcn = SAGEConv3(n_in, n_h)
-        self.weight = Parameter(torch.Tensor(n_h, n_h))
-        self.reluWeight = Parameter(torch.Tensor(n_h).fill_(0.25))
+        self.gcn = SAGEConv3(n_in, n_h2)
+        self.gcn1 = SAGEConv3(n_in, n_h1)
+        self.gcn2 = SAGEConv3(n_h1, n_h2)
+        self.weight = Parameter(torch.Tensor(n_h2, n_h2))
+        self.prelu1 = Parameter(torch.Tensor(n_h1).fill_(0.25))
+        self.prelu2 = Parameter(torch.Tensor(n_h2).fill_(0.25))
 
         self.reset_parameters()
 
@@ -36,18 +39,18 @@ class DGI(torch.jit.ScriptModule):
         torch.nn.init.xavier_uniform_(self.weight)
 
     @torch.jit.script_method
-    def forward_(self, pos_x, neg_x, edge_index):
-        # type: (Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor, Tensor]
-        """Returns the latent space for the input arguments, their
-        corruptions and their summary representation."""
-        pos_z = F.prelu(self.gcn(pos_x, edge_index), self.reluWeight)
-        neg_z = F.prelu(self.gcn(neg_x, edge_index), self.reluWeight)
+    def forward_(self, pos_x, neg_x, first_edge_index,
+        second_edge_index=torch.Tensor([])):
+        pos_z = self.embedding_(pos_x, first_edge_index, second_edge_index)
+        neg_z = self.embedding_(neg_x, first_edge_index, second_edge_index)
         summary = torch.sigmoid(torch.mean(pos_z, dim=0))
         return pos_z, neg_z, summary
 
     @torch.jit.script_method
     def loss(self, pos_z, neg_z, summary):
-        r"""Computes the mutual information maximization objective."""
+        r"""Evaluates the loss using the difference between
+        the mutual information of positive and negative patches
+        with global summary."""
         pos_loss = -torch.log(
             self.discriminate(pos_z, summary, sigmoid=True) + 1e-15).mean()
         neg_loss = -torch.log(
@@ -58,28 +61,28 @@ class DGI(torch.jit.ScriptModule):
     @torch.jit.script_method
     def discriminate(self, z, summary, sigmoid=True):
         # type: (Tensor, Tensor, bool) -> Tensor
-        r"""Given the patch-summary pair :obj:`z` and :obj:`summary`, computes
-        the probability scores assigned to this patch-summary pair.
-
-        Args:
-            z (Tensor): The latent space.
-            sigmoid (bool, optional): If set to :obj:`False`, does not apply
-                the logistic sigmoid function to the output.
-                (default: :obj:`True`)
+        r"""Evaluates the probablity score of the patch given the global summary.
+        Does not apply the sigmoid function to the discrimination output when sigmoid is set to False.
         """
         value = torch.matmul(z, torch.matmul(self.weight, summary))
         return torch.sigmoid(value) if sigmoid else value
 
     @torch.jit.script_method
-    def predict_(self, x, edge_index):
-        return F.prelu(self.gcn(x, edge_index), self.reluWeight)
+    def embedding_(self, x, first_edge_index, second_edge_index=torch.Tensor([])):
+        r"""Generates learned representation of the input nodes."""
+        if second_edge_index.size(0) == 0:
+            x = F.prelu(self.gcn(x, first_edge_index), self.prelu2)
+        else:
+            x = F.prelu(self.gcn1(x, second_edge_index), self.prelu1)
+            x = F.prelu(self.gcn2(x, first_edge_index), self.prelu2)
+        return x
 
 
 FLAGS = None
 
 
 def main():
-    dgi = DGI(FLAGS.input_dim, FLAGS.output_dim)
+    dgi = DGI(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.output_dim)
     dgi.save(FLAGS.output_file)
 
 
@@ -90,6 +93,11 @@ if __name__ == '__main__':
         type=int,
         default=-1,
         help="input dimension of node features")
+    parser.add_argument(
+        "--hidden_dim",
+        type=int,
+        default=32,
+        help="hidden dimension of dgi convolution layer")
     parser.add_argument(
         "--output_dim",
         type=int,

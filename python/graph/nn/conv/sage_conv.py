@@ -126,8 +126,9 @@ class SAGEConv3(torch.jit.ScriptModule):
     the inner-nodes and first-order nodes. Thus, we can reduce some calculation.
     """
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, act=False):
         super(SAGEConv3, self).__init__()
+        self.act = act
 
         self.weight = Parameter(torch.Tensor(in_channels * 2, out_channels))
         self.bias = Parameter(torch.zeros(out_channels))
@@ -148,6 +149,8 @@ class SAGEConv3(torch.jit.ScriptModule):
         x = torch.cat([x, out], dim=1)
         out = torch.matmul(x, self.weight)
         out = out + self.bias
+        if self.act:
+            out = F.relu(out)
         out = F.normalize(out, p=2.0, dim=-1)
         return out
 
@@ -189,6 +192,46 @@ class SAGEConv4(torch.jit.ScriptModule):
         x = torch.cat([x, out], dim=1)
         out = torch.matmul(x, self.weight)
         out = out + self.bias
+        out = F.normalize(out, p=2.0, dim=-1)
+        return out
+
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, self.in_channels,
+                                   self.out_channels)
+
+
+class EdgeSAGEConv(torch.jit.ScriptModule):
+    """
+    The difference between SAGEConv3 is that EdgeSAGEConv considers not only
+    node feature but also edge feature.
+    """
+
+    def __init__(self, in_channels, edge_channels, out_channels, act=False):
+        super(EdgeSAGEConv, self).__init__()
+        self.act = act
+
+        self.weight = Parameter(torch.Tensor(in_channels * 2 + edge_channels, out_channels))
+        self.bias = Parameter(torch.zeros(out_channels))
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        torch.nn.init.xavier_uniform_(self.weight)
+        if self.bias.numel() > 1:
+            uniform(self.bias.numel(), self.bias)
+
+    @torch.jit.script_method
+    def forward(self, x, edge, edge_index):
+        # type: (Tensor, Tensor, Tensor) -> Tensor
+        row, col = edge_index[0], edge_index[1]
+        e_out = scatter_mean(edge[col], row, dim=0)
+        out = scatter_mean(x[col], row, dim=0)
+        x = x[0:out.size(0)]
+        x = torch.cat([x, out, e_out], dim=1)
+        out = torch.matmul(x, self.weight)
+        out = out + self.bias
+        if self.act:
+            out = F.relu(out)
         out = F.normalize(out, p=2.0, dim=-1)
         return out
 

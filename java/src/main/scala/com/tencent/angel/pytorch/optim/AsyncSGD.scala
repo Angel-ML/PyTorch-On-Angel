@@ -17,7 +17,6 @@
 package com.tencent.angel.pytorch.optim
 
 import java.util.concurrent.Future
-
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.ml.psf.optim.{AsyncOptimParam, AsyncSGDFunc}
@@ -35,15 +34,17 @@ class AsyncSGD(eta: Double, decay: Double) extends AsyncOptim(eta, decay) {
   }
 
   override def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult] = {
-    grads.zip(rowIds).map(f => f._1.setRowId(f._2))
+    grads.zip(rowIds).foreach(f => f._1.setRowId(f._2))
     val param = new AsyncOptimParam(matrix.id, grads, Array(eta), Array(offset, getNumSlots()))
     val func = new AsyncSGDFunc(param)
     matrix.psfUpdate(func)
   }
 
   override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
-    asyncUpdate(matrix, offset, (0 until grads.length).toArray, grads)
+    asyncUpdate(matrix, offset, grads.indices.toArray, grads)
   }
+
+  override def getType: Int = 0
 
   override def toString: String =
     s"AsyncSGD ${super.toString}"

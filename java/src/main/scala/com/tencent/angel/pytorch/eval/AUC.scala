@@ -25,17 +25,13 @@ class AUC extends Evaluation {
     // sort by predict
     val sorted = pairs.sortBy(f => f._2)
     sorted.cache()
-
     val numTotal = sorted.count()
     val numPositive = sorted.filter(f => f._1 > 0).count()
     val numNegetive = numTotal - numPositive
-
     // calculate the summation of ranks for positive samples
     val sumRanks = sorted.zipWithIndex().filter(f => f._1._1.toInt == 1).map(f => f._2 + 1).reduce(_ + _)
     val auc = sumRanks * 1.0 / numPositive / numNegetive - (numPositive + 1.0) / 2.0 / numNegetive
-
     sorted.unpersist()
     auc
   }
-
 }

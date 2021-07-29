@@ -16,7 +16,7 @@
  */
 package com.tencent.angel.pytorch.params
 
-import org.apache.spark.ml.param.{Param, Params, StringArrayParam}
+import org.apache.spark.ml.param.{Param, Params}
 
 trait HasInputFeaturePath extends Params {
 

@@ -19,7 +19,6 @@ package com.tencent.angel.pytorch.eval
 import org.apache.spark.rdd.RDD
 import scala.language.implicitConversions
 
-
 private[pytorch]
 abstract class Evaluation {
 
@@ -29,16 +28,20 @@ abstract class Evaluation {
 private[pytorch]
 object Evaluation {
 
+  def eval(metrics: Array[String], pairs: RDD[(Double, Double)]): Map[String, Double] = {
+    metrics.map(name => (name.toLowerCase(), Evaluation.apply(name).calculate(pairs))).toMap
+  }
+
   def apply(name: String): Evaluation = {
     name.toLowerCase match {
       case "auc" => new AUC()
       case "acc" => new Accuracy()
       case "binary_acc" => new BinaryAccuracy()
+      case "precision" => new Precision()
+      case "recall" => new Recall()
+      case "F1Score" | "f1score" | "f1" => new F1Score()
+      case "rmse" => new RMSE()
     }
-  }
-
-  def eval(metrics: Array[String], pairs: RDD[(Double, Double)]): Map[String, Double] = {
-    metrics.map(name => (name.toLowerCase(), Evaluation.apply(name).calculate(pairs))).toMap
   }
 
   implicit def pairNumericRDDToPairDoubleRDD[T](rdd: RDD[(T, T)])(implicit num: Numeric[T])

@@ -27,12 +27,13 @@ class RGCNPartition(index: Int,
                     neighbors: Array[Long],
                     types: Array[Int],
                     trainIdx: Array[Int],
-                    trainLabels: Array[Float],
+                    trainLabels: Array[Array[Float]],
                     testIdx: Array[Int],
-                    testLabels: Array[Float],
-                    torchModelPath: String) extends
+                    testLabels: Array[Array[Float]],
+                    torchModelPath: String,
+                    useSecondOrder: Boolean) extends
   GCNPartition(index, keys, indptr, neighbors, trainIdx, trainLabels,
-    testIdx, testLabels, torchModelPath) {
+    testIdx, testLabels, torchModelPath, useSecondOrder) {
 
 
   override
@@ -40,7 +41,9 @@ class RGCNPartition(index: Int,
                  numSample: Int,
                  featureDim: Int,
                  model: GNNPSModel,
-                 isTraining: Boolean = true): JMap[String, Object] = {
+                 isTraining: Boolean,
+                 fieldNum: Int,
+                 fieldMultiHot: Boolean): JMap[String, Object] = {
     val batchKeys = new LongOpenHashSet()
     val index = new Long2IntOpenHashMap()
     val srcs = new LongArrayList()
@@ -55,13 +58,21 @@ class RGCNPartition(index: Int,
     val (first, firstTypes, second, secondTypes) = MakeEdgeIndex.makeEdgeIndex(batchIdx,
       keys, indptr, neighbors, types, srcs, dsts,
       edgeTypes, batchKeys, index, numSample, model)
-    val x = MakeFeature.makeFeatures(index, featureDim, model)
+
     val params = new JHashMap[String, Object]()
+    val (x, batchIds, fieldIds) = MakeSparseBiFeature.makeFeatures(index, featureDim, model, -1, params, fieldNum, fieldMultiHot)
+
     params.put("first_edge_index", first)
-    params.put("second_edge_index", second)
     params.put("first_edge_type", firstTypes)
-    params.put("second_edge_type", secondTypes)
+    if (useSecondOrder) {
+      params.put("second_edge_index", second)
+      params.put("second_edge_type", secondTypes)
+    }
     params.put("x", x)
+    if (fieldNum > 0) {
+      params.put("batch_ids", batchIds)
+      params.put("field_ids", fieldIds)
+    }
     params.put("batch_size", new Integer(batchIdx.length))
     params.put("feature_dim", new Integer(featureDim))
     params
@@ -71,7 +82,9 @@ class RGCNPartition(index: Int,
   override
   def makeParams(nodes: Array[Long],
                  featureDim: Int,
-                 model: GNNPSModel): JMap[String, Object] = {
+                 model: GNNPSModel,
+                 fieldNum: Int,
+                 fieldMultiHot: Boolean): JMap[String, Object] = {
     throw new AngelException("cannot determine edge types for nodes without edges")
   }
 

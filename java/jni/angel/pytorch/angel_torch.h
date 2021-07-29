@@ -73,6 +73,22 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getInputDim
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserInputDim
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemInputDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemInputDim
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getInputSizes
  * Signature: (J)[J
  */
@@ -89,10 +105,42 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getNumFields
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserNumFields
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemNumFields
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemNumFields
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getEmbeddingDim
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingDim
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getUserEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getUserEmbeddingDim
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getItemEmbeddingDim
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemEmbeddingDim
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -109,6 +157,22 @@ JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getEmbeddingsSi
  * Signature: (J)I
  */
 JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getParametersTotalSize
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getDenseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getDenseColNums
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getSparseColNums
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_tencent_angel_pytorch_Torch_getSparseColNums
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -137,19 +201,27 @@ JNIEXPORT void JNICALL Java_com_tencent_angel_pytorch_Torch_save
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
- * Method:    word2vecBackward
+ * Method:    dssmForward
+ * Signature: (JLjava/util/Map;)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_dssmForward
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    dssmBackward
  * Signature: (JLjava/util/Map;)F
  */
-JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_word2vecBackward
+JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_dssmBackward
   (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
  * Method:    gcnBackward
- * Signature: (JLjava/util/Map;)F
+ * Signature: (JLjava/util/Map;Z)F
  */
 JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward
-  (JNIEnv *, jclass, jlong, jobject);
+  (JNIEnv *, jclass, jlong, jobject, jboolean);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
@@ -165,6 +237,14 @@ JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod
  * Signature: (J)[F
  */
 JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getParameters
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getMatsParameters
+ * Signature: (J)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_getMatsParameters
   (JNIEnv *, jclass, jlong);
 
 /*

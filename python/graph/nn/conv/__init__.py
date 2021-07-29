@@ -15,8 +15,13 @@
 
 from .sage_conv import SAGEConv
 from .gcn_conv import GCNConv, GCNConv2
-from .sage_conv import SAGEConv, SAGEConv2, SAGEConv3, SAGEConv4
+from .sage_conv import SAGEConv, SAGEConv2, SAGEConv3, SAGEConv4, EdgeSAGEConv
+from .bisage_conv import BiSAGEConv
+from .igmc_conv import IGMCConv
+from .hgat_conv import HGATConv
 from .rgcn_conv import RGCNConv
+from .han_conv import HANConv
+from .gat_conv import GATConv
 
 __all__ = [
     'GCNConv',
@@ -25,5 +30,11 @@ __all__ = [
     'SAGEConv2',
     'SAGEConv3',
     'SAGEConv4',
+    'EdgeSAGEConv',
     'RGCNConv',
+    'IGMCConv',
+    'BiSAGEConv',
+    'HGATConv',
+    'HANConv',
+    'GATConv'
 ]

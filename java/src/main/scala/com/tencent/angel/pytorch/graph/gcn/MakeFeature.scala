@@ -27,7 +27,6 @@ object MakeFeature {
     val x = new Array[Float](size * featureDim)
     val keys = index.keySet().toLongArray
     val features = model.getFeatures(keys)
-    //    assert(features.size() == keys.length)
     val it = features.long2ObjectEntrySet().fastIterator()
     while (it.hasNext) {
       val entry = it.next()
@@ -58,13 +57,19 @@ object MakeFeature {
     }
   }
 
-  def sampleFeatures(size: Int, featureDim: Int, model: GNNPSModel): Array[Float] = {
+  def sampleFeatures(size: Int, featureDim: Int, model: GNNPSModel, dataFormat: String): Array[Float] = {
     val x = new Array[Float](size * featureDim)
     val features = model.sampleFeatures(size)
-    for (idx <- 0 until size)
-      makeFeature(idx * featureDim, features(idx), x)
+    for (idx <- 0 until size){
+      val f = if (features(idx) != null) features(idx) else {
+        if (dataFormat == "dense") {
+          new IntFloatVector(featureDim, new IntFloatDenseVectorStorage(featureDim))
+        } else {
+          new IntFloatVector(featureDim, new IntFloatSortedVectorStorage(featureDim))
+        }
+      }
+      makeFeature(idx * featureDim, f, x)
+    }
     x
   }
-
-
 }
