@@ -32,12 +32,12 @@ object HANExample {
     val params = ArgsUtil.parse(args)
     val mode = params.getOrElse("mode", "yarn-cluster")
     val edgeInput = params.getOrElse("edgePath", "")
-    val userFeatureInput = params.getOrElse("userFeaturePath", "")
-    val itemFeatureInput = params.getOrElse("itemFeaturePath", "")
-    val userEmbeddingPath = params.getOrElse("userEmbeddingPath", "")
+    val featureInput = params.getOrElse("featurePath", "") // feature path for user nodes
+    val embeddingPath = params.getOrElse("embeddingPath", "") // output embedding path for user nodes
     val outputModelPath = params.getOrElse("outputModelPath", "")
     val featureEmbedInputPath = params.getOrElse("featureEmbedInputPath", "")
-    val fieldNum = params.getOrElse("fieldNum", "-1").toInt
+    val fieldNum = params.getOrElse("fieldNum", "-1").toInt // num of field for user nodes' sparse features
+    // embedding dimension of lookup embedding matrix for user nodes' sparse features
     val featEmbedDim = params.getOrElse("featEmbedDim", "-1").toInt
     val fieldMultiHot = params.getOrElse("fieldMultiHot", "false").toBoolean
     val labelPath = params.getOrElse("labelPath", "")
@@ -46,8 +46,7 @@ object HANExample {
     val torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
     val testRatio = params.getOrElse("testRatio", "0.01").toFloat
-    val userFeatureDim = params.getOrElse("userFeatureDim", "2").toInt
-    val itemFeatureDim = params.getOrElse("itemFeatureDim", "-1").toInt
+    val featureDim = params.getOrElse("featureDim", "2").toInt // feature dimension for user nodes
     val optimizer = params.getOrElse("optimizer", "adam")
     var psNumPartition = params.getOrElse("psNumPartition", "1").toInt
     var numPartitions = params.getOrElse("numPartitions", "1").toInt
@@ -71,6 +70,8 @@ object HANExample {
     val itemTypes = params.getOrElse("itemTypes", "266").toInt
     val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
     val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
+    var useSharedSamples = params.getOrElse("useSharedSamples", "false").toBoolean
+    if (batchSize < 128 || fieldNum > 0) useSharedSamples = false
     // sep for reading edges
     val sep = params.getOrElse("sep",  "tab") match {
       case "space" => " "
@@ -88,7 +89,6 @@ object HANExample {
 
     val han = new HAN()
     han.setTorchModelPath(torchModelPath)
-    han.setUserFeatureDim(userFeatureDim)
     han.setOptimizer(optimizer)
     han.setBatchSize(batchSize)
     han.setStepSize(stepSize)
@@ -110,16 +110,17 @@ object HANExample {
     han.setSaveCheckpoint(saveCheckpoint)
     han.setHasNodeType(hasNodeType)
     han.setItemTypes(itemTypes)
-    han.setFeatureDim(userFeatureDim)
+    han.setFeatureDim(featureDim)
     han.setNumLabels(numLabels)
     han.setBatchSizeMultiple(batchSizeMultiple)
     han.setFeatEmbedPath(featureEmbedInputPath)
     han.setFeatEmbedDim(featEmbedDim)
     han.setFieldNum(fieldNum)
     han.setFieldMultiHot(fieldMultiHot)
+    han.setUseSharedSamples(useSharedSamples)
 
     val edges = GraphIO.load(edgeInput, isWeighted = hasNodeType, sep = sep)
-    val userFeatures = IOFunctions.loadFeature(userFeatureInput, sep = "\t")
+    val userFeatures = IOFunctions.loadFeature(featureInput, sep = "\t")
     val labels = if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath)
     val testLabels = if (testLabelPath.length > 0)
       Option(if (numLabels > 1) IOFunctions.loadMultiLabel(testLabelPath, sep = "p") else IOFunctions.loadLabel(testLabelPath))
@@ -130,9 +131,9 @@ object HANExample {
     if (actionType == "train")
       han.fit(model, graph)
 
-    if (userEmbeddingPath.length > 0) {
+    if (embeddingPath.length > 0) {
       val userEmbedding = han.genLabelsEmbedding(model, graph)
-      GraphIO.save(userEmbedding, userEmbeddingPath, seq = " ")
+      GraphIO.save(userEmbedding, embeddingPath, seq = " ")
     }
 
     if (actionType == "train" && outputModelPath.length > 0) {

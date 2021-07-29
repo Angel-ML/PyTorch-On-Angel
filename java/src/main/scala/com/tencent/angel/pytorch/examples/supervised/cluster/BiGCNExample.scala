@@ -73,7 +73,7 @@ object BiGCNExample {
     val hasNodeType = params.getOrElse("hasNodeType", "false").toBoolean
     val hasEdgeType = params.getOrElse("hasEdgeType", "false").toBoolean
     var useSharedSamples = params.getOrElse("useSharedSamples", "true").toBoolean
-    if (batchSize < 128) useSharedSamples = false
+    if (batchSize < 128 || userFieldNum > 0) useSharedSamples = false
     val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
     val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
     val sep = params.getOrElse("sep", "space") match {
