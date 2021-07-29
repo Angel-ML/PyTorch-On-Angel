@@ -11,11 +11,11 @@ from nn.conv import SAGEConv3
 
 class UnsupervisedSAGE(torch.jit.ScriptModule):
 
-    def __init__(self, in_dim, hidden, out_dim):
+    def __init__(self, in_dim, out_dim):
         super(UnsupervisedSAGE, self).__init__()
 
-        self.gcn1 = SAGEConv3(in_dim, hidden, act=True)
-        self.gcn2 = SAGEConv3(hidden, out_dim)
+        self.gcn1 = SAGEConv3(in_dim, out_dim, act=True)
+        self.gcn2 = SAGEConv3(out_dim, out_dim)
 
     @torch.jit.script_method
     def forward_(self, pos_x, neg_x, first_edge_index, second_edge_index):
@@ -62,7 +62,7 @@ FLAGS = None
 
 
 def main():
-    sage = UnsupervisedSAGE(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.output_dim)
+    sage = UnsupervisedSAGE(FLAGS.input_dim, FLAGS.output_dim)
     sage.save(FLAGS.output_file)
 
 
@@ -73,11 +73,6 @@ if __name__ == '__main__':
         type=int,
         default=-1,
         help="input dimention of node features")
-    parser.add_argument(
-        "--hidden_dim",
-        type=int,
-        default=-1,
-        help="hidden dimension of graphsage convolution layer")
     parser.add_argument(
         "--output_dim",
         type=int,
