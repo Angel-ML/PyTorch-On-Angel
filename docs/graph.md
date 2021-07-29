@@ -19,14 +19,16 @@
 
 ##### Dense data or low dimentition sparse data (dim less than 2000 generally)
 - Angel PS resource: in order to ensure that Angel does not hang up, it is necessary to configure memory that is about twice the size of the model. The formula for calculating the size of the graph feature is: node_num * feature_dim * 4Byte, such as: 1kw nodes, feature_dim is 100, the size of graph feature is about 4G, then set ps.instances=3, ps.memory=4G is reasonable(total memory is 2~3 times of data saved in ps.). Of course, this is only a simple case. In many algorithms, there are many types of data saved in ps, such as: edge, node feature, node label etc.
-	- **Semi GraphSage/GAT**: edge, node feature, node label, the model size is: (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte)
-	- **RGCN/HAN**: edge with type(dst type), node feature, node label, the model size is: (edge\_num * 2 * 8Byte + edge\_num * 4Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte)
-	- **DGI/Unsupervised GraphSage**: edge, node feature, the model size is: (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte)
-	- **Semi Bipartite GraphSage**: edge * 2, user feature, item feature, user label, the model size is: (edge\_num * 2 * 8Byte * 2 + user\_num * user\_feature_dim * 4Byte + item\_num * item\_feature\_dim * 4Byte + user\_label\_num * 4Byte)
-	- **Semi Heterogeneous GraphSage**: edge * 2, user feature, item feature, user label, item type, the model size is: (edge\_num * 2 * 8Byte * 2 + user\_num * user\_feature\_dim * 4Byte + item_num * item\_feature\_dim * 4Byte + user\_label\_num * 4Byte + edge_num * 4Byte * 2)
-	- **Unsupervised GraphSage**: edge, node feature, the model size is: (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte)
-	- **Unsupervised Bipartite GraphSage**: edge * 2, user feature, item feature, the model size is: (edge\_num * 2 * 8Byte * 2 + user_num * user\_feature\_dim * 4Byte + item\_num * item_feature_dim * 4Byte)
-	- **IGMC**: edge with type, user feature, item feature, themodel size is: (edge\_num * 2 * 8Byte + edge\_num * 4Byte + user\_num * user\_feature\_dim * 4Byte + item\_num * item_feature\_num * 4Byte)
+
+	Algo Name | Data saved on ps | Resource
+	---------------- | --------------- | ---------------
+	**Semi GraphSage/GAT** | edge, node feature, node label | (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte)
+	**RGCN/HAN** | edge with type(dst type), node feature, node label | (edge\_num * 2 * 8Byte + edge\_num * 4Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte)
+	**RGCN/HAN** | edge with type(dst type), node feature, node label | (edge\_num * 2 * 8Byte + edge\_num * 4Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte)
+	**DGI/Unsupervised GraphSage** | edge, node feature | (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte)
+	**Semi Bipartite GraphSage** | edge * 2, user feature, item feature, user label | (edge\_num * 2 * 8Byte * 2 + user\_num * user\_feature_dim * 4Byte + item\_num * item\_feature\_dim * 4Byte + user\_label\_num * 4Byte)
+	**Unsupervised Bipartite GraphSage** | edge * 2, user feature, item feature | (edge\_num * 2 * 8Byte * 2 + user_num * user\_feature\_dim * 4Byte + item\_num * item_feature_dim * 4Byte)
+	**IGMC** | edge with type, user feature, item feature | (edge\_num * 2 * 8Byte + edge\_num * 4Byte + user\_num * user\_feature\_dim * 4Byte + item\_num * item_feature\_num * 4Byte)
 
 - Spark Executor Resource: the configuration of Spark resources is mainly considered from the aspect of training data(Edge data is usually saved on Spark Executor), and it is best to save 2 times the input data. If the memory is tight, 1x is acceptable, but it will be relatively slow. For example, a 10 billion edge set is about 200G in size, and a 30G * 20 configuration is sufficient. 
 
@@ -41,77 +43,15 @@ low-dimension embedding: input\_embedding\_dim * slots * input\_dim * 4Byte
 - `input_field_num`: the number of features with value; (As for Bipartite GNN or Heterogeneous GNN, the parameter is input\_user\_field\_num or input\_item\_field\_num, which is the number of user's feature with value or item's feature with value)
 
 - Angel PS Resource:in order to ensure that Angel does not hang up, it is necessary to configure memory that is about twice the size of the model.
-	- **Semi GraphSage**: edge, node feature, node label, embedding matrix, the model size is: (edge\_num * 2 * 8Byte + node\_num * `field_num` * 4Byte + the num of node with label * 4Byte + `input_embedding_dim * slots * input_dim * 4Byte`)
-	- **Semi Bipartite GraphSage/HGAT**: edge * 2, user feature, item feature, user label, user embedding matrix, item embedding matrix, the model size is: (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + item\_num * `item_field_num` * 4Byte + user\_label\_num * 4Byte+ `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
+
+	Algo Name | Data saved on ps | Resource
+	---------------- | --------------- | ---------------
+	**Semi GraphSage** | edge, node feature, node label, embedding matrix | (edge\_num * 2 * 8Byte + node\_num * `field_num` * 4Byte + the num of node with label * 4Byte + `input_embedding_dim * slots * input_dim * 4Byte`)
+	**Semi Bipartite GraphSage** | edge * 2, user feature, item feature, user label, user embedding matrix, item embedding matrix | (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + item\_num * `item_field_num` * 4Byte + user\_label\_num * 4Byte + `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
+	**HGAT** | edge * 2, user feature, item feature, user embedding matrix, item embedding matrix | (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + item\_num * `item_field_num` * 4Byte + `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
 	
 
 - Spark Executor Resource:the configuration of Spark resources is mainly considered from the aspect of training data(Edge data is usually saved on Spark Executor), and it is best to save 2 times the input data. If the memory is tight, 1x is acceptable, but it will be relatively slow. For example, a 10 billion edge set is about 200G in size, and a 30G * 20 configuration is sufficient. 
-
-### Public parameters
-
-#### Input/Oupput Path
-
-Property Name | Default | Meaning
----------------- | --------------- | ---------------
-edgePath | "" | the input path (hdfs) of edge table
-featurePath | "" | the input path (hdfs) of feature table
-labelPath | "" | the input path (hdfs) of label table
-testLabelPath | "" | the input path (hdfs) of validate label table
-torchModelPath | model.pt | the name of the model file, xx.pt in this example
-predictOutputPath | "" | hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-embeddingPath | "" | hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-outputModelPath | "" | hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-userFeaturePath | "" | the input path (hdfs) of user feature table
-itemFeaturePath | "" | the input path (hdfs) of item feature table
-userEmbeddingPath | "" | hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
-itemEmbeddingPath | "" | hdfs path to save the embedding for all item nodes in the graph, set it if you need the embedding vectors
-featureEmbedInputPath | "" | the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
-
-#### Data Parameters
-
-Property Name | Default | Meaning
----------------- | --------------- | ---------------
-featureDim | -1 | the dimension for the feature for each node, which should be equal with the number when generate the model file
-edgeFeatureDim | -1 | the dimension for the feature of edge, which should be equal with the number when generate the model file
-itemTypes | 266 | types of item nodes, which is also the num of meta-paths, for HAN
-userFeatureDim | -1 | the dimension for the feature for each user node, which should be equal with the number when generate the model file
-itemFeatureDim | -1 | the dimension for the feature for each item node, which should be equal with the number when generate the model file
-fieldNum | -1 | the field num of user, the default is `-1`, set it if you need only when data is high-sparse
-featEmbedDim | -1 | the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
-userFieldNum | -1 | the field num of user, the default is `-1`, set it if you need only when data is high-sparse
-itemFieldNum | -1 | the field num of item, the default is `-1`, set it if you need only when data is high-sparse
-userFeatEmbedDim | -1 | the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
-itemFeatEmbedDim | -1 | the dim of item embedding, the default is `-1`, set it if you need only when data is high-sparse
-fieldMultiHot | false | whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
-format | sparse | should be sparse/dense
-numLabels | 1 | the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-
-#### Algorithm Parameters
-
-Property Name | Default | Meaning
----------------- | --------------- | ---------------
-stepSize | 0.01 | the learning rate when training
-decay | 0.001 | the decay of learning ratio, the default is 0
-optimizer | adma | adam/momentum/sgd/adagrad
-numEpoch | 10 | number of epoches you want to run 
-testRatio | 0.5 | use how many nodes from the label file for testing(if `testLabelPath` is set, the testRatio is invalid)
-trainRatio | 0.5 | randomly sampling part of samples to train; for unsupervised gnn algo
-samples | 5 | the number of samples when sampling neighbors
-userNumSamples | 5 | the number of samples of user neighbors training in the next step
-itemNumSamples | 5 | the number of samples of item neighbors
-second | true | whether use second hop sampling
-batchSize | 100 | batch size for each optimizing step
-actionType | train | hshould be train/predict
-numBatchInit | 5 | we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
-evals | acc | eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-periods | 1000 | save pt model every few epochs
-saveCheckpoint | false | whether checkpoint ps model after init parameters to ps
-checkpointInterval | 0 | save ps model every few epochs
-validatePeriods | 5 | validate model every few epochs
-useSharedSamples | false | whether reuse the samples to calculate the train acc to accelerate, the default is false
-numPartitions | 10 | partition the data into how many partitions
-psNumPartition | 10 | partition the data into how many partitions on ps
-batchSizeMultiple | 10 | the multiple of batchsize used to accelerate when predict prediction or embedding
 
 
 ### Example of GraphSage
@@ -236,6 +176,8 @@ batchSizeMultiple | 10 | the multiple of batchsize used to accelerate when predi
     - `fieldNum`: the field num of user, the default is `-1`, set it if you need only when data is high-sparse
     - `featEmbedDim`: the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `fieldMultiHot`: whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
+
+	Other parameters see [details](./public_parameters_gnn.md)
     
     **Notes:**
     - The model file, graphsage_cora.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -314,7 +256,7 @@ Here we give an example of how to run DGI algorithm beyond Pytorch on Angel.
           embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```  
-    Here we give a short description for the parameters in the submit script.   
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     **Notes:**
     - The model file, dgi_cora.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -396,7 +338,7 @@ Here we give an example of using RGCN over pytorch on angel.
           predictOutputPath:$predictOutputPath embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
 
@@ -556,7 +498,7 @@ Here we give an example of how to run GAT algorithm beyond Pytorch on Angel.
           predictOutputPath:$predictOutputPath embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
     
     **Notes:**
     - The model file, gat_am.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -684,7 +626,7 @@ Here we give an example of using HAN over pytorch on angel.
           predictOutputPath:$predictOutputPath embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
 	- `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
@@ -820,7 +762,7 @@ Here we give an example of using Semi Bipartite GraphSage over pytorch on angel.
           predictOutputPath:$predictOutputPath userEmbeddingPath:$userEmbeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     - `userFeatureDim`: the dimension for the feature for each user node, which should be equal with the number when generate the model file
     - `itemFeatureDim`: the dimension for the feature for each item node, which should be equal with the number when generate the model file
@@ -909,7 +851,7 @@ Here we give an example of using Unsupervised Bipartite GraphSage over pytorch o
           predictOutputPath:$predictOutputPath userEmbeddingPath:$userEmbeddingPath itemEmbeddingPath:$itemEmbeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst
     - userFeatureDim: the dimension for the feature for each user node, which should be equal with the number when generate the model file
@@ -1045,9 +987,8 @@ Here we give an example of using HGAT over pytorch on angel.
           predictOutputPath:$predictOutputPath userEmbeddingPath:$userEmbeddingPath itemEmbeddingPath:$itemEmbeddingPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
-    - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
     - `userFeatureDim`: the dimension for the feature for each user node, which should be equal with the number when generate the model file
     - `itemFeatureDim`: the dimension for the feature for each item node, which should be equal with the number when generate the model file
     - `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
@@ -1146,7 +1087,7 @@ Here we give an example of using IGMC over pytorch on angel.
           predictOutputPath:$predictOutputPath outputModelPath:$outputModelPath\
           actionType:train numBatchInit:5
     ```  
-    Here we give a short description for the parameters in the submit script. 
+    Here we give a short description for the parameters in the submit script. Detail parameters see [details](./public_parameters_gnn.md)
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
     - userFeatureDim: the dimension for the feature for each user node, which should be equal with the number when generate the model file
