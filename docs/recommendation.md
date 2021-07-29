@@ -11,15 +11,15 @@ Learning the Weight of Feature Interactions via Attention Networks](https://arxi
 * **[DCN](../python/recommendation/dcn.py)** from Ruoxi Wang et al: [Deep & Cross Network for Ad Click Predictions](https://arxiv.org/pdf/1708.05123.pdf)
 * **[DeepAndWide](../python/recommendation/deepandwide.py)** from Heng-Tze Cheng et al: [Wide & Deep Learning for Recommender Systems](https://arxiv.org/pdf/1606.07792.pdf)
 * **[PNN](../python/recommendation/pnn.py)** from Yanru Qu et al: [Product-based Neural Networks for User Response Prediction](https://arxiv.org/pdf/1611.00144.pdf)
-* **[XDeepFM](../python/recommendation/xdeepfm.py)** from Jianxun Lian et al: [xDeepFM: Combining Explicit and Implicit Feature Interactions
-for Recommender Systems](https://arxiv.org/pdf/1803.05170.pdf)
+* **[XDeepFM](../python/recommendation/xdeepfm.py)** from Jianxun Lian et al: [xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems](https://arxiv.org/pdf/1803.05170.pdf)
+* **[ESMM](../python/recommendation/esmm.py)** from Xiao Ma et al: [Entire Space Multi-Task Model: An Effective Approach for Estimating Post-Click Conversion Rate](https://arxiv.org/abs/1804.07931)
 
 We use DeepFM as an example to illustrate the details process of running an algorithm.
-The methods are similar for other algorithms.
+The methods are similar for other algorithms except *ESMM*. 
 
 ### Example of DeepFM
 
-1. ** Generate pytorch script model**
+1. **Generate pytorch script model**
     First, go to directory of python/recommendation and execute the following command:
     ```$xslt
     python deepfm.py --input_dim 148 --n_fields 13 --embedding_dim 10 --fc_dims 10 5 1
@@ -31,9 +31,12 @@ The methods are similar for other algorithms.
     - embedding_dim: dimension for embedding layer
     - fc_dims: the dimensions for fc layers in deepfm. "10 5 1" indicates a two-layers mlp composed with one 10x5 layer and one 5x1 layer.
 
+    For **ESMM**, there are extra parameters:
+    - shared_embedding: flag for whether embedding layer is shared for 2 tasks. 
+
     This python script will generate a TorchScript model with the structure of dataflow graph for deepfm. This file is named ``deepfm.pt``.
 
-2. ** Preparing the input data**
+2. **Preparing the input data**
     The input data of DeepFM should be libsvm or libffm format. Each line of the input data represents one data sample.
     ```
     label feature1:value1 feature2:value2
@@ -42,8 +45,13 @@ The methods are similar for other algorithms.
     ```
     label field1:feature1:value1 field2:feature2:value2
     ```
+    The input data of **ESMM** should be somehow extended libsvm format with labels seperated by '#'.
+    ```
+    ctrLabel#cvrLabel feature1:value1 feature2:value2
+    ```
+   
 
-3. ** Training model**
+3. **Training model**
     After obtaining the model file (deepfm.pt) and the input data, we can submit a task through Spark on Angel to train the model. The command is:
     ```$xslt
     source ./spark-on-angel-env.sh  
