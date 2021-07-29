@@ -832,7 +832,7 @@ Here we give an example of using IGMC over pytorch on angel.
 
 1. If you want to use GAT or HGAT, pytorch >= v1.5.0.
 2. If you found loss is NAN or does not converge, you can decrease the learning rate, such as: 0.001,0.0001 or lower.
-3. If you encounter the error `file not found model.json`, please check the version of model.pt and the version of pytorch, whether tem are matched.
+3. If you encounter the error `file not found model.json`, please check the version of model.pt and the version of pytorch, whether them are matched.
 4. If you encounter the error `java.lang.UnsupportedOperationException: empty collection`, please check whether the input data is empty.
 5. If you encounter the error `ERROR AngelYarnClient: submit application to yarn failed.`, ps did not apply for resources, change another cluster or try later.
 6. If you encounter the error `java.lang.UnsatisfiedLinkError: no torch_angel in java.library.path`, please check whether the torch path is correct.
