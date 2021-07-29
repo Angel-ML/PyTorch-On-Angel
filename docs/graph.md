@@ -49,6 +49,7 @@ low-dimension embedding: input\_embedding\_dim * slots * input\_dim * 4Byte
 	**Semi GraphSage** | edge, node feature, node label, embedding matrix | (edge\_num * 2 * 8Byte + node\_num * `field_num` * 4Byte + the num of node with label * 4Byte + `input_embedding_dim * slots * input_dim * 4Byte`)
 	**Semi Bipartite GraphSage** | edge * 2, user feature, item feature, user label, user embedding matrix, item embedding matrix | (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + item\_num * `item_field_num` * 4Byte + user\_label\_num * 4Byte + `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
 	**HGAT** | edge * 2, user feature, item feature, user embedding matrix, item embedding matrix | (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + item\_num * `item_field_num` * 4Byte + `user_embedding_dim * slots * user_feature_dim * 4Byte + item_embedding_dim * slots * item_feature_dim * 4Byte`)
+	**HAN** | edge * 2, user feature, user embedding matrix | (edge\_num * 2 * 8Byte * 2 + user\_num * `user_field_num` * 4Byte + `user_embedding_dim * slots * user_feature_dim * 4Byte`)
 	
 
 - Spark Executor Resource:the configuration of Spark resources is mainly considered from the aspect of training data(Edge data is usually saved on Spark Executor), and it is best to save 2 times the input data. If the memory is tight, 1x is acceptable, but it will be relatively slow. For example, a 10 billion edge set is about 200G in size, and a 30G * 20 configuration is sufficient. 
@@ -146,7 +147,7 @@ low-dimension embedding: input\_embedding\_dim * slots * input\_dim * 4Byte
           --class com.tencent.angel.pytorch.example.supervised.cluster.GraphSageExample \
           ./pytorch-on-angel-${VERSION}.jar \   # jar from Compiling java submodule
           edgePath:$edgePath featurePath:$featurePath labelPath:$labelPath\
-          torchModelPath:graphsage_sparse.pt featureDim:1433 stepSize:0.01\
+          torchModelPath:graphsage_sparse.pt featureDim:32 stepSize:0.01\
           optimizer:adam numEpoch:10 testRatio:0.5 fieldNum:20 featEmbedDim:8 \
           numPartitions:50 format:sparse samples:10 batchSize:128\
           predictOutputPath:$predictOutputPath embeddingPath:$embeddingPath outputModelPath:$outputModelPath\
