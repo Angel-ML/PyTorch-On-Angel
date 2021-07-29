@@ -63,3 +63,48 @@ useSharedSamples | false | whether reuse the samples to calculate the train acc 
 numPartitions | 10 | partition the data into how many partitions
 psNumPartition | 10 | partition the data into how many partitions on ps
 batchSizeMultiple | 10 | the multiple of batchsize used to accelerate when predict prediction or embedding
+
+
+### Algorithm Parameters for Pytorch Model
+
+Property Name | Default | Meaning
+---------------- | --------------- | ---------------
+input_dim | -1 | input dimention of node features
+hidden_dim | -1 | hidden dimension of convolution layer
+output_dim | -1 | the number of classes for supervised algo, or the dimension of output embedding for unsupervised algo  
+output_file | "model_name.pt" | output file name 
+input_user_dim | -1 | input dimention of user node features
+input_item_dim | -1 | input dimention of item node features
+input_user_field_num | -1 | the number of user field num, for high-sparse
+input_item_field_num | -1 | the number of item field num, for high-sparse
+input_user_embedding_dim | -1 | embedding dim of user node features, for high-sparse
+input_item_embedding_dim | -1 | embedding dim of item node features, for high-sparse
+field_num | -1 | field num of node features, for high-sparse
+input_embedding_dim | -1 | embedding dim of node features, for high-sparse
+encode | dense | the encode of feature, optional value:dense, one-hot, multi-hot
+edge_input_dim | -1 | the dimension of edge feature
+item_types | -1 | the num of item_types
+negative_size | 1 | multiples of positive samples
+heads | 1 | the number of attention heads, the default is 1
+dropout | 0 | the dropout ratio
+edge_types | false | the dimension of edge feature
+method | classification | the encode of feature, the default is `classification`, optional value:classification,regression for IGMC
+task_type | classification | the type of task, the default value is `classification`, optional value:classification or multi-label-classification(multi labels for one node)
+class_weights | "" | class weights for supervised GNN, in order to balance class, such as: 0.1,0.9
+
+
+
+### Result for Algorithm
+
+Property Name | Result for predictOutputPath | Result for Embedding
+---------------- | --------------- | ---------------
+**Semi GraphSage** | node label softmax | node embedding
+**DGI/Unsupervised** | - | node embedding
+**RGCN** | node label softmax | node embedding
+**EdgeProp** | node label softmax embedding | - 
+**GAT** | node label softmax embedding | - 
+**HAN** | user-node label softmax embedding | - 
+**Semi Bipartite GraphSage ** | user-node label softmax embedding | - 
+**Unsupervised Bipartite GraphSage** | - | node embedding
+**HGAT** | - | node embedding
+**IGMC** | src dst label | -
