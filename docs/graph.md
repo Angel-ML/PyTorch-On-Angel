@@ -74,26 +74,9 @@ low-dimension embedding: input\_embedding\_dim * slots * input\_dim * 4Byte
 	- `encode`: the encode of feature, the default is `dense`, optional value:dense,one-hot,multi-hot
 
 2. **Preparing input data**
-    There are three inputs required for graphsage, including the edge table, the feature table and the label table.
+    There are three inputs required for graphsage, including the edge table, the node feature table and the node label table.
 
-    The edge table is a file or directory which exists on hdfs. Each line of the file is an edge composed with a source node and a destination node seperated by space/comma/tab. Each node is encoded with a Long type numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since graphsage is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).  
@@ -200,24 +183,9 @@ Here we give an example of how to run DGI algorithm beyond Pytorch on Angel.
     This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of dgi. After that, you will obtain a model file named "dgi_cora.pt". Here we use the Cora dataset as an example, where the feature dimension for each node is 1433.
 
 2. **Preparing input data**
-    There are two inputs required for dgi, including the edge table and the feature table.
+    There are two inputs required for dgi, including the edge table and the node feature table.
 
-    The edge table is a file or directory which exists on hdfs. Each line of the file is an edge composed with a source node and a destination node seperated by space/comma/tab. Each node is encoded with a Long type numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -278,30 +246,9 @@ Here we give an example of using RGCN over pytorch on angel.
     This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of rgcn. After that, you will obtain a model file named "rgcn_mutag.pt". Where n_class is the number of classes, n_relations is the number of types for edges and n_bases is a parameter of RGCN to avoid overfitting.
 
 2. **Preparing input data**
-    There are three inputs required for graphsage, including the edge table, the feature table and the label table.
+    There are three inputs required for graphsage, including the edge table with type, the node feature table and the node label table.
 
-    RGCN also requires an edge file, a feature file and a label file, similar to graphsage. The difference is that each entry in the edge file contains three elements, including a source node, a destination node and an edge type. For example:
-	```
-	src dst type
-	```
-	The src and dst is a Long numeric while the type is an Integer numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since rgcn is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).  
@@ -362,30 +309,9 @@ Here we give an example of using EdgeProp over pytorch on angel.
     This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of edgeProp. After that, you will obtain a model file named "edgeprop_eth.pt". Where edge\_input\_dim is the dimension of edge feature, other parameters are same as GraphSAGE.
 
 2. **Preparing input data**
-    There are three inputs required for graphsage, including the edge table, the feature table and the label table.
+    There are three inputs required for graphsage, including the edge table with edge feature, the node feature table and the node label table.
 
-    EdgeProp also requires an edge file, a feature file and a label file, similar to graphsage. The difference is that each entry in the edge file contains three elements, including a source node, a destination node and an edge feature. For example:
-	```
-	src\tdst\tedge_feature
-	```
-	The src and dst is a Long numeric while the edge_feature is a string, which can be dense or libsvm.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since rgcn is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -442,26 +368,9 @@ Here we give an example of how to run GAT algorithm beyond Pytorch on Angel.
     This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of GAT. After that, you will obtain a model file named "gat_am.pt". Here we use the am dataset as an example, where the feature dimension for each node is 32 with 11 different classes.
 
 2. **Preparing input data**
-    There are three inputs required for graphsage, including the edge table, the feature table and the label table.
+    There are three inputs required for graphsage, including the edge table, the node feature table and the node label table.
 
-    The edge table is a file or directory which exists on hdfs. Each line of the file is an edge composed with a source node and a destination node seperated by space/comma/tab. Each node is encoded with a Long type numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since graphsage is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -530,30 +439,11 @@ Here we give an example of using HAN over pytorch on angel.
 	- `encode`: the encode of feature, the default is `dense`, optional value:dense,one-hot,multi-hot 
 
 2. **Preparing input data**
-    There are three inputs required for han, including the edge table, the feature table and the label table.
+    There are three inputs required for han, including the edge table with type, the node feature table and the node label table.
 
-    HAN requires an edge file which contains three columns including the source node column, the destination column and the node type column. The third column indicates the destination nodes' types, each type indicates a meta-path of "A-B-A". For example:
-	```
-	src dst type
-	```
-	The src and dst is a Long numeric while the type is an Integer numeric.
+    HAN requires an edge file which contains three columns including the source node column, the destination column and the node type column. The third column indicates the destination nodes' types, each type indicates a meta-path of "A-B-A".  
 
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since han is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+	The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -665,30 +555,9 @@ Here we give an example of using Semi Bipartite GraphSage over pytorch on angel.
 	- `task_type`: the type of task, the default value is `classification`, optional value:classification or multi-label-classification(multi labels for one node)
 
 2. **Preparing input data**
-    There are three inputs required for han, including the edge table, the user feature table, the item feature table and the label table for user node.
+    There are three inputs required for han, including the edge table, the user node feature table, the item node feature table and the label table for user node.
 
-    Semi Bipartite GraphSage requires an edge file which contains two columns including the source node column, the destination column. For example:
-	```
-	src dst
-	```
-	The src and dst is a Long numeric while the type is an Integer numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    The label table contains a set of node-label pairs. Since han is a semi-supervised model, the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).  
@@ -793,28 +662,9 @@ Here we give an example of using Unsupervised Bipartite GraphSage over pytorch o
     This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of Unsupervised Bipartite GraphSage. After that, you will obtain a model file named "un_bipartite_graphsage.pt". 
 
 2. **Preparing input data**
-    There are three inputs required for Unsupervised Bipartite GraphSage, including the edge table, the user feature table，and item feature table.
+    There are three inputs required for Unsupervised Bipartite GraphSage, including the edge table, the user node feature table，and item node feature table.
 
-    Unsupervised Bipartite GraphSage requires an edge file which contains two columns including the source node column, the destination column. For example:
-	```
-	src dst
-	```
-	The src and dst is a Long numeric while the type is an Integer numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -891,28 +741,9 @@ Here we give an example of using HGAT over pytorch on angel.
 	- `encode`: the encode of feature, the default is `dense`, optional value:dense,one-hot,multi-hot
 
 2. **Preparing input data**
-    There are three inputs required for HGAT, including the edge table, the user feature table，and item feature table.
+    There are three inputs required for HGAT, including the edge table, the user feature node table，and item node feature table.
 
-    HGAT requires an edge file which contains two columns including the source node column, the destination column. For example:
-	```
-	src dst
-	```
-	The src and dst is a Long numeric while the type is an Integer numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
@@ -1026,28 +857,9 @@ Here we give an example of using IGMC over pytorch on angel.
 	- `method`: the encode of feature, the default is `classification`, optional value:classification,regression.
 
 2. **Preparing input data**
-    There are three inputs required for IGMC, including the edge table(with rating), the feature table.
+    There are three inputs required for IGMC, including the edge table(with rating), the node feature table.
 
-    IGMC requires an edge file which contains three columns including the source node column, the destination column and rating column. For example:
-	```
-	src dst rating
-	```
-	The src and dst is a Long numeric while the rating is an Integer numeric.
-
-    The feature table is a file or directory from hdfs. Each line specifies the feature of one node. The format can be sparse or dense. 
-
-    For sparse format, each line is formated as follows:
-    ```
-    node\tf1:v1 f2:v2 f3:v3
-    ```
-    The separator between ``node`` and ``features`` is tab while space is used as separator between different feature indices.
-
-    For dense format, it is:
-    ```
-    node\tv1 v2 v3
-    ```
-
-    Note that, each node contained in the edge table should has a feature line in the feature table file.
+    The detail info see [Data Format](./data_format_gnn.md)
 
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
