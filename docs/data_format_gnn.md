@@ -16,4 +16,4 @@ node label data table | - | ```node label```,the label table may only contain a 
 **Note**:  
 - Data format should be same in one job, if there are more than one feature data or edge data with feature.
 - Note that, each node contained in the edge table should has a feature line in the feature table file.
-- High-Sparse data, the format is same to sparse, the only difference is that there is field(s) in high-sparse data and each field must has value.
+- **High-Sparse data**, the format is same to sparse, the only difference is that there is field(s) in high-sparse data and each field must has value. As for multi-hot of field, now we only support **the last field** can be multi-hot.
