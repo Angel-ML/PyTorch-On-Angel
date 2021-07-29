@@ -7,10 +7,10 @@ Contents | Data Format | Format Demo | Data Demo
 ---------------- | --------------- | --------------- | ---------------
 edge data table | - | ```src dst```, seperated by space/comma/tab | ```0 1```
 edge data table with type or rating | - | ```src dst type/rating``` | ```0 1 0```
-edge data table with edge feature | dense | ```src\tdst\tv1 v2 v3``` | ```0	1	0.3 0.5 1 2```
-edge data table with edge feature | sparse | ```src\tdst\tf1:v1 f2:v2 f3:v3``` | ```0	1	1:1 2:1 5:2.1```
-node feature data table | dense | ```node\tv1 v2 v3``` | ```0	0.1 0.3 1.3```
-node feature data table | sparse | ```node\tf1:v1 f2:v2 f3:v3``` | ```0	1:1 3:2 5:1.2```
+edge data table with edge feature | dense | ```src\tdst\tv1 v2 v3``` | ```0\t1\t0.3 0.5 1 2```
+edge data table with edge feature | sparse | ```src\tdst\tf1:v1 f2:v2 f3:v3``` | ```0\t1\t1:1 2:1 5:2.1```
+node feature data table | dense | ```node\tv1 v2 v3``` | ```0\t0.1 0.3 1.3```
+node feature data table | sparse | ```node\tf1:v1 f2:v2 f3:v3``` | ```0\t1:1 3:2 5:1.2```
 node label data table | - | ```node label```,the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label. | ```0 1```
 
 **Note**:  
