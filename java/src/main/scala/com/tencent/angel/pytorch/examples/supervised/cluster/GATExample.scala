@@ -62,6 +62,8 @@ object GATExample {
     val validatePeriods = params.getOrElse("validatePeriods", "1").toInt
     val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt
     val useSecondOrder = params.getOrElse("second", "false").toBoolean
+    var useSharedSamples = params.getOrElse("useSharedSamples", "false").toBoolean
+    if (batchSize < 128 || fieldNum > 0) useSharedSamples = false
     val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
     if (numLabels > 1) evals = "multi_auc"
     val sep = params.getOrElse("sep", "space") match {
@@ -101,6 +103,7 @@ object GATExample {
     gat.setFeatEmbedDim(featEmbedDim)
     gat.setFieldNum(fieldNum)
     gat.setFieldMultiHot(fieldMultiHot)
+    gat.setUseSharedSamples(useSharedSamples)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false, sep = sep)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
