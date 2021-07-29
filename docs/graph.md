@@ -4,18 +4,18 @@
 
 
 ### Introduction
-#### How to predict
+#### 1. How to predict
 1. change the input data path and output path
 2. change **actionType** to `predict`
 3. you can get hdfs://modelPath/xx.pt to local, then use it as training; Or you can use the hdfs path, and set `--files hdfs://modelPath/xx.pt`, in this way the `torchModelPath` can be remove
 
 
-#### How to train incrementally
+#### 2. How to train incrementally
 1. change the input data path and output path, or you can use the same data to train incrementally
 2. set **actionType** as `train` 
 3. you can get hdfs://modelPath/xx.pt to local, then use it as training; Or you can use the hdfs path, and set `--files hdfs://modelPath/xx.pt`, in this way the `torchModelPath` can be remove
 
-#### How to calculate the resource
+#### 3. How to calculate the resource
 In order to know how to set the resources, you should figure out where the data saved firstly, and then calculate how much data storage space, finally set 2~3 times of data storage. The detail calculation method refer to [Resource Calculation Method](./resource_calculation_method.md)
 
 
