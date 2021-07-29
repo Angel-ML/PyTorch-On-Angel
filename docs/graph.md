@@ -49,11 +49,14 @@ low-dimension embedding: input\_embedding\_dim * slots * input\_dim * 4Byte
 
 ### Public parameters
 
+#### Input/Oupput Path
+
 Property Name | Default | Meaning
 ---------------- | --------------- | ---------------
 edgePath | "" | the input path (hdfs) of edge table
 featurePath | "" | the input path (hdfs) of feature table
 labelPath | "" | the input path (hdfs) of label table
+testLabelPath | "" | the input path (hdfs) of validate label table
 torchModelPath | model.pt | the name of the model file, xx.pt in this example
 predictOutputPath | "" | hdfs path to save the predict label for all nodes in the graph, set it if you need the label
 embeddingPath | "" | hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
@@ -63,6 +66,53 @@ itemFeaturePath | "" | the input path (hdfs) of item feature table
 userEmbeddingPath | "" | hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
 itemEmbeddingPath | "" | hdfs path to save the embedding for all item nodes in the graph, set it if you need the embedding vectors
 featureEmbedInputPath | "" | the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
+
+#### Data Parameters
+
+Property Name | Default | Meaning
+---------------- | --------------- | ---------------
+featureDim | -1 | the dimension for the feature for each node, which should be equal with the number when generate the model file
+edgeFeatureDim | -1 | the dimension for the feature of edge, which should be equal with the number when generate the model file
+itemTypes | 266 | types of item nodes, which is also the num of meta-paths, for HAN
+userFeatureDim | -1 | the dimension for the feature for each user node, which should be equal with the number when generate the model file
+itemFeatureDim | -1 | the dimension for the feature for each item node, which should be equal with the number when generate the model file
+fieldNum | -1 | the field num of user, the default is `-1`, set it if you need only when data is high-sparse
+featEmbedDim | -1 | the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
+userFieldNum | -1 | the field num of user, the default is `-1`, set it if you need only when data is high-sparse
+itemFieldNum | -1 | the field num of item, the default is `-1`, set it if you need only when data is high-sparse
+userFeatEmbedDim | -1 | the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
+itemFeatEmbedDim | -1 | the dim of item embedding, the default is `-1`, set it if you need only when data is high-sparse
+fieldMultiHot | false | whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
+format | sparse | should be sparse/dense
+numLabels | 1 | the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
+
+#### Algorithm Parameters
+
+Property Name | Default | Meaning
+---------------- | --------------- | ---------------
+stepSize | 0.01 | the learning rate when training
+decay | 0.001 | the decay of learning ratio, the default is 0
+optimizer | adma | adam/momentum/sgd/adagrad
+numEpoch | 10 | number of epoches you want to run 
+testRatio | 0.5 | use how many nodes from the label file for testing(if `testLabelPath` is set, the testRatio is invalid)
+trainRatio | 0.5 | randomly sampling part of samples to train; for unsupervised gnn algo
+samples | 5 | the number of samples when sampling neighbors
+userNumSamples | 5 | the number of samples of user neighbors training in the next step
+itemNumSamples | 5 | the number of samples of item neighbors
+second | true | whether use second hop sampling
+batchSize | 100 | batch size for each optimizing step
+actionType | train | hshould be train/predict
+numBatchInit | 5 | we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
+evals | acc | eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
+periods | 1000 | save pt model every few epochs
+saveCheckpoint | false | whether checkpoint ps model after init parameters to ps
+checkpointInterval | 0 | save ps model every few epochs
+validatePeriods | 5 | validate model every few epochs
+useSharedSamples | false | whether reuse the samples to calculate the train acc to accelerate, the default is false
+numPartitions | 10 | partition the data into how many partitions
+psNumPartition | 10 | partition the data into how many partitions on ps
+batchSizeMultiple | 10 | the multiple of batchsize used to accelerate when predict prediction or embedding
+
 
 ### Example of GraphSage
 
@@ -182,36 +232,10 @@ featureEmbedInputPath | "" | the embedding matrix for features(contains user, it
 
     Here we give a short description for the parameters in the submit script. 
 
-    - edgePath: the input path (hdfs) of edge table
-    - featurePath: the input path (hdfs) of feature table
-    - labelPath: the input path (hdfs) of label table
-    - torchModelPath: the name of the model file, graphsage_cora.pt in this example
-    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
     - `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
     - `fieldNum`: the field num of user, the default is `-1`, set it if you need only when data is high-sparse
     - `featEmbedDim`: the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `fieldMultiHot`: whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in graphsage
-    - batchSize: batch size for each optimizing step
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step. 
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
     
     **Notes:**
     - The model file, graphsage_cora.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -291,27 +315,6 @@ Here we give an example of how to run DGI algorithm beyond Pytorch on Angel.
           actionType:train numBatchInit:5
     ```  
     Here we give a short description for the parameters in the submit script.   
-
-    - edgePath: the input path (hdfs) of edge table
-    - featurePath: the input path (hdfs) of feature table
-    - torchModelPath: the name of the model file, graphsage_cora.pt in this example
-    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in dgi
-    - batchSize: batch size for each optimizing step
-    - trainRatio: randomly sampling part of samples to train
-    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0. 
 
     **Notes:**
     - The model file, dgi_cora.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -396,30 +399,6 @@ Here we give an example of using RGCN over pytorch on angel.
     Here we give a short description for the parameters in the submit script. 
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - featurePath: the input path (hdfs) of feature table
-    - labelPath: the input path (hdfs) of label table
-    - torchModelPath: the name of the model file, graphsage_cora.pt in this example
-    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in rgcn
-    - batchSize: batch size for each optimizing step
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step. 
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
 
     **Notes:**
     - The model file, rgcn_mutag.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -504,32 +483,6 @@ Here we give an example of using EdgeProp over pytorch on angel.
     Here we give a short description for the parameters in the submit script. 
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and edge feature
-    - featurePath: the input path (hdfs) of feature table
-    - labelPath: the input path (hdfs) of label table
-    - torchModelPath: the name of the model file, edgeprop_eth.pt in this example
-    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
-    - edgeFeatureDim: the dimension for the feature of edge, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in edgeProp
-    - batchSize: batch size for each optimizing step
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step. 
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
 
     **Notes:**
     - The model file, rgcn_mutag.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -604,33 +557,6 @@ Here we give an example of how to run GAT algorithm beyond Pytorch on Angel.
           actionType:train numBatchInit:5
     ```
     Here we give a short description for the parameters in the submit script. 
-
-    - edgePath: the input path (hdfs) of edge table
-    - featurePath: the input path (hdfs) of feature table
-    - labelPath: the input path (hdfs) of label table
-    - torchModelPath: the name of the model file, gat_am.pt in this example
-    - featureDim: the dimension for the feature for each node, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in graphsage
-    - batchSize: batch size for each optimizing step
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - embeddingPath: hdfs path to save the embedding for all nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step. 
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
     
     **Notes:**
     - The model file, gat_am.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -690,7 +616,7 @@ Here we give an example of using HAN over pytorch on angel.
 2. **Submit model to cluster**
     After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
 	**dense /low-sparse data**:    
-```$xslt
+	```$xslt
     source ./spark-on-angel-env.sh  
    $SPARK_HOME/bin/spark-submit \
           --master yarn-cluster\
@@ -724,8 +650,8 @@ Here we give an example of using HAN over pytorch on angel.
           actionType:train numBatchInit:5
     ```
 
-	**high-sparse data**: 
-```$xslt
+	**high-sparse data**:  
+	```$xslt
     source ./spark-on-angel-env.sh  
    $SPARK_HOME/bin/spark-submit \
           --master yarn-cluster\
@@ -761,33 +687,12 @@ Here we give an example of using HAN over pytorch on angel.
     Here we give a short description for the parameters in the submit script. 
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - featurePath: the input path (hdfs) of feature table
-    - labelPath: the input path (hdfs) of label table
-    - torchModelPath: the name of the model file, graphsage_cora.pt in this example
-    - featureDim: the dimension for the feature for each user node, which should be equal with the number when generate the model file
-    - itemTypes: types of item nodes, which is also the num of meta-paths
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing
-    - numPartitions: partition the data into how many partitions
-    - format: should be sparse/dense
-    - samples: the number of samples when sampling neighbors in rgcn
-    - batchSize: batch size for each optimizing step
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - embeddingPath: hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - validatePeriods: validate model every few epochs. 
-
-    **Notes:**
+	- `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
+    - `fieldNum`: the field num of user, the default is `-1`, set it if you need only when data is high-sparse
+    - `featEmbedDim`: the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
+    - `fieldMultiHot`: whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
+    
+	**Notes:**
     - The model file, rgcn_mutag.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
 
 
@@ -917,12 +822,6 @@ Here we give an example of using Semi Bipartite GraphSage over pytorch on angel.
     ```
     Here we give a short description for the parameters in the submit script. 
 
-    - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - userFeaturePath: the input path (hdfs) of user feature table
-    - itemFeaturePath: the input path (hdfs) of item feature table
-    - labelPath: the input path (hdfs) of label table
-    - testLabelPath: the input path (hdfs) of validate label table
-    - torchModelPath: the name of the model file, semi_bipartite_graphsage.pt in this example
     - `userFeatureDim`: the dimension for the feature for each user node, which should be equal with the number when generate the model file
     - `itemFeatureDim`: the dimension for the feature for each item node, which should be equal with the number when generate the model file
     - `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
@@ -931,31 +830,6 @@ Here we give an example of using Semi Bipartite GraphSage over pytorch on angel.
     - `userFeatEmbedDim`: the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `itemFeatEmbedDim`；the dim of item embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `fieldMultiHot`: whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing(if `testLabelPath` is set, the testRatio is invalid)
-    - numPartitions: partition the data into how many partitions
-    - psNumPartition: partition the data into how many partitions on ps
-    - format: should be sparse/dense
-    - userNumSamples: the number of samples of user neighbors
-    - itemNumSamples: the number of samples of item neighbors
-    - batchSize: batch size for each optimizing step
-    - useBalancePartition:whether use balance partition, the default is `false`
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - userEmbeddingPath: hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
-    - second: whether use second hop sampling
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
-    - numLabels: the num of multi-label classification task if numLabels > 1, `the default is 1` for single-label classification. 
 
     **Notes:**
     - The model file, semi\_bipartite\_graphsage.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -1037,35 +911,9 @@ Here we give an example of using Unsupervised Bipartite GraphSage over pytorch o
     ```
     Here we give a short description for the parameters in the submit script. 
 
-    - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - userFeaturePath: the input path (hdfs) of user feature table
-    - itemFeaturePath: the input path (hdfs) of item feature table
-    - torchModelPath: the name of the model file, unsupervised_bipartite_graphsage.pt in this example
+    - edgePath: the input path (hdfs) of edge table, which contains src, dst
     - userFeatureDim: the dimension for the feature for each user node, which should be equal with the number when generate the model file
     - itemFeatureDim: the dimension for the feature for each item node, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - trainRatio: randomly sampling part of samples to train
-    - numPartitions: partition the data into how many partitions
-    - psNumPartition: partition the data into how many partitions on ps
-    - format: should be sparse/dense
-    - userNumSamples: the number of samples of user neighbors
-    - itemNumSamples: the number of samples of item neighbors
-    - batchSize: batch size for each optimizing step
-    - useBalancePartition:whether use balance partition, the default is `false`
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - userEmbeddingPath: hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
-    - itemEmbeddingPath: hdfs path to save the embedding for all item nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
-    - second: whether use second hop sampling
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
 
     **Notes:**
     - The model file, unsupervised\_bipartite\_graphsage.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -1200,9 +1048,6 @@ Here we give an example of using HGAT over pytorch on angel.
     Here we give a short description for the parameters in the submit script. 
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - userFeaturePath: the input path (hdfs) of user feature table
-    - itemFeaturePath: the input path (hdfs) of item feature table
-    - torchModelPath: the name of the model file, unsupervised_bipartite_graphsage.pt in this example
     - `userFeatureDim`: the dimension for the feature for each user node, which should be equal with the number when generate the model file
     - `itemFeatureDim`: the dimension for the feature for each item node, which should be equal with the number when generate the model file
     - `featureEmbedInputPath`:the embedding matrix for features(contains user, item), set it if you need to increment train only when data is high-sparse
@@ -1211,28 +1056,6 @@ Here we give an example of using HGAT over pytorch on angel.
     - `userFeatEmbedDim`: the dim of user embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `itemFeatEmbedDim`；the dim of item embedding, the default is `-1`, set it if you need only when data is high-sparse
     - `fieldMultiHot`: whether the field is multi-hot(only support the last field is multi-hot), the default is `false`, set it if you need only when data is high-sparse
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - trainRatio: randomly sampling part of samples to train
-    - numPartitions: partition the data into how many partitions
-    - psNumPartition: partition the data into how many partitions on ps
-    - format: should be sparse/dense
-    - userNumSamples: the number of samples of user neighbors
-    - itemNumSamples: the number of samples of item neighbors
-    - batchSize: batch size for each optimizing step
-    - useBalancePartition:whether use balance partition, the default is `false`
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - userEmbeddingPath: hdfs path to save the embedding for all user nodes in the graph, set it if you need the embedding vectors
-    - itemEmbeddingPath: hdfs path to save the embedding for all item nodes in the graph, set it if you need the embedding vectors
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
 
     **Notes:**
     - The model file, hgat_sparse.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
@@ -1326,32 +1149,8 @@ Here we give an example of using IGMC over pytorch on angel.
     Here we give a short description for the parameters in the submit script. 
 
     - edgePath: the input path (hdfs) of edge table, which contains src, dst and type
-    - userFeaturePath: the input path (hdfs) of user feature table
-    - itemFeaturePath: the input path (hdfs) of item feature table
-    - torchModelPath: the name of the model file, unsupervised_bipartite_graphsage.pt in this example
-    - `userFeatureDim`: the dimension for the feature for each user node, which should be equal with the number when generate the model file
-    - `itemFeatureDim`: the dimension for the feature for each item node, which should be equal with the number when generate the model file
-    - stepSize: the learning rate when training
-    - optimizer: adam/momentum/sgd/adagrad
-    - numEpoch: number of epoches you want to run 
-    - testRatio: use how many nodes from the label file for testing(if `testLabelPath` is set, the testRatio is invalid)
-    - numPartitions: partition the data into how many partitions
-    - psNumPartition: partition the data into how many partitions on ps
-    - format: should be sparse/dense
-    - numSamples: the number of samples of neighbors
-    - batchSize: batch size for each optimizing step
-    - useBalancePartition:whether use balance partition, the default is `false`
-    - predictOutputPath: hdfs path to save the predict label for all nodes in the graph, set it if you need the label
-    - outputModelPath: hdfs path to save the training model file, which is also a torch model pt file, set it if you want to do predicting or incremental training in the next step
-    - actionType: should be train/predict
-    - numBatchInit: we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
-    - periods: save pt model every few epochs
-    - saveCheckpoint: whether checkpoint ps model after init parameters to ps
-    - checkpointInterval: save ps model every few epochs
-    - decay: the decay of learning ratio, the default is 0
-    - evals: eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall
-    - validatePeriods: validate model every few epochs
-    - useSharedSamples: whether reuse the samples to calculate the train acc to accelerate, the default is false
+    - userFeatureDim: the dimension for the feature for each user node, which should be equal with the number when generate the model file
+    - itemFeatureDim: the dimension for the feature for each item node, which should be equal with the number when generate the model file
 
     **Notes:**
     - The model file, igmc\_ml\_class.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
