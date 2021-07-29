@@ -11,9 +11,10 @@ edge data table with edge feature | dense | ```src\tdst\tv1 v2 v3``` | ```0\t1\t
 edge data table with edge feature | sparse | ```src\tdst\tf1:v1 f2:v2 f3:v3``` | ```0\t1\t1:1 2:1 5:2.1```
 node feature data table | dense | ```node\tv1 v2 v3``` | ```0\t0.1 0.3 1.3```
 node feature data table | sparse | ```node\tf1:v1 f2:v2 f3:v3``` | ```0\t1:1 3:2 5:1.2```
-node label data table | - | ```node label```,the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label. | ```0 1```
+node label data table | - | ```node label``` | ```0 1```
 
 **Note**:  
 - Data format should be same in one job, if there are more than one feature data or edge data with feature.
 - Note that, each node contained in the edge table should has a feature line in the feature table file.
+- the label table may only contain a small set of node-label pairs. Each line of the label file is a node-label pair where space is used as the separator between node and label.
 - **High-Sparse data**, the format is same to sparse, the only difference is that there is field(s) in high-sparse data and each field must has value. As for multi-hot of field, now we only support **the last field** can be multi-hot.

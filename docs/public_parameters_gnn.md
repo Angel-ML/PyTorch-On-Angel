@@ -96,7 +96,7 @@ class_weights | "" | class weights for supervised GNN, in order to balance class
 
 ### Result for Algorithm
 
-Property Name | Result for predictOutputPath | Result for Embedding
+Property Name | Result for predictOutputPath | Result for EmbeddingPath
 ---------------- | --------------- | ---------------
 **Semi GraphSage** | node label softmax | node embedding
 **DGI/Unsupervised** | - | node embedding
@@ -104,7 +104,7 @@ Property Name | Result for predictOutputPath | Result for Embedding
 **EdgeProp** | node label softmax embedding | - 
 **GAT** | node label softmax embedding | - 
 **HAN** | user-node label softmax embedding | - 
-**Semi Bipartite GraphSage ** | user-node label softmax embedding | - 
+**Semi Bipartite GraphSage** | user-node label softmax embedding | - 
 **Unsupervised Bipartite GraphSage** | - | node embedding
 **HGAT** | - | node embedding
 **IGMC** | src dst label | -
