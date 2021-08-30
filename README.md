@@ -19,7 +19,9 @@ class SGC(nn.Module):
 这里前向传播网络仅仅只是一个全连接网络，没有隐藏层和激活函数。
 论文原文对这段叙述为，图卷积的好处大部分来自于局部平均还不是隐藏层中的非线性变化。原SGC公式简化为：
 ![image](https://user-images.githubusercontent.com/39088547/131299217-fad8cf7c-8143-499b-bdf7-e3da92f1e6ed.png)
+
 这里X为原始输入，theta可以理解成节点神经元参数，S理解成边的参数（邻接矩阵）。
+
 发现这里S中是没有需要训练的参数的，而theta只需要一个全连接层即可。
 因此，作者删除原GCN模型中的隐藏层部分，改为一个输入为特征向量大小，输出为分类的全连接层，但注意数据在输入SGN前需要增加预处理计算部分。
 
@@ -59,7 +61,7 @@ def sgc_precompute(features, adj, degree):
     precompute_time = perf_counter()-t
     return features, precompute_time
 ```
-论文中采用默认degree为2，一次我们实验中也预设degree=2，实际如果需要的话这里可以设层一个变量处理。  
+论文中采用默认degree为2，因此我们实验中也预设degree=2，实际如果需要的话这里可以设层一个变量处理。  
 sgc的输入为邻接矩阵，但我们原论文中的GCN_conv并不是采用邻接矩阵实现的：
 ```python
   def forward(self, x, edge_index):
