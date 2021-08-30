@@ -26,7 +26,7 @@ class SGC(nn.Module):
 因此，作者删除原GCN模型中的隐藏层部分，改为一个输入为特征向量大小，输出为类别数的全连接层，但注意数据在输入SGN前需要增加预处理计算部分。
 
 ### 增加预处理计算
-实际train过程如下：
+原论文作者提供代码下，实际train过程如下：
 ```python
 model = get_model(args.model, features.size(1), labels.max().item()+1, args.hidden, args.dropout, args.cuda)
 
@@ -61,8 +61,8 @@ def sgc_precompute(features, adj, degree):
     precompute_time = perf_counter()-t
     return features, precompute_time
 ```
-论文中采用默认degree为2，因此我们实验中也预设degree=2，实际如果需要的话这里可以设层一个变量处理。  
-sgc的输入为邻接矩阵，但我们原论文中的GCN_conv并不是采用邻接矩阵实现的：
+论文中采用默认degree为2，因此我们实验中也预设degree=2，实际如果需要的话这里可以设一个变量处理。  
+sgc的输入为邻接矩阵，但我们原论文中的GCN_conv并不是采用邻接矩阵实现的，原论文实现图卷积代码如下：
 ```python
   def forward(self, x, edge_index):
         # type: (Tensor, Tensor) -> Tensor
@@ -95,10 +95,13 @@ sgc的输入为邻接矩阵，但我们原论文中的GCN_conv并不是采用邻
 输入数据送入propagate之前需要先经过norm函数处理：
 这里对图卷积的实现参考：
 ![image](https://user-images.githubusercontent.com/39088547/131299684-931cf597-2d8e-44aa-8c24-fb925a7b0cf4.png)
+
 和邻接矩阵实现对比：
+
 ![image](https://user-images.githubusercontent.com/39088547/131299712-59daacb3-8417-491f-945b-f79ef217593d.png)
+
 因为添加了自循环和归一化，在特征传递效果上理论上是更好的（这句胡说八道的QAQ）
-Norm返回从上面公式看就相当于邻接矩阵，两者效果相同，
+Norm返回从上面公式看就相当于邻接矩阵，两者效果相同，最后输出如下：
 ```python
     def propagate(self, edge_index, x, norm):
         # type: (Tensor, Tensor, Tensor) -> Tensor
@@ -109,7 +112,7 @@ Norm返回从上面公式看就相当于邻接矩阵，两者效果相同，
         return out #输出最后结果
 
 ```
-然后再对GCNconv进行简单修改写一个SGCNconv
+综上对GCNconv进行简单修改写一个SGCNconv
 ```python
     @torch.jit.script_method
     def propagate(self, edge_index, x, norm):
@@ -121,7 +124,7 @@ Norm返回从上面公式看就相当于邻接矩阵，两者效果相同，
         out = self.update(out)
         return out
 ```
-然后在模型对于地方简单修改即可。
+然后在模型其他地方简单修改即可。
 ### 实验结果
 我们主要考虑训练速度的问题，采用perf_counter记录时间；
 
