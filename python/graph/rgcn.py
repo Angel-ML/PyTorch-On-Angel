@@ -90,7 +90,7 @@ FLAGS = None
 
 def main():
     rgcn = RelationGCN(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.n_relations, FLAGS.n_bases, FLAGS.n_class)
-    rgcn.save(FLAGS.output_file)
+    rgcn.save(FLAGS.output_file)#创建模型并保存
 
 
 if __name__ == '__main__':

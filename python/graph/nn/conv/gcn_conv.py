@@ -13,7 +13,7 @@
 # the License.
 #
 # !/usr/bin/env python
-
+import os
 import torch
 from torch.nn import Parameter
 
@@ -52,9 +52,10 @@ class GCNConv(torch.jit.ScriptModule):
         fill_value = 1
         edge_index, edge_weight = add_remaining_self_loops(
             edge_index, edge_weight, fill_value, num_nodes)
+        #13264条边，其中有2708条自循环边
 
         row, col = edge_index[0], edge_index[1]
-        deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
+        deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)#deg 大小为2708
         deg_inv_sqrt = deg.pow(-0.5)
 
         return edge_index, deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
@@ -70,7 +71,7 @@ class GCNConv(torch.jit.ScriptModule):
     @torch.jit.script_method
     def propagate(self, edge_index, x, norm):
         # type: (Tensor, Tensor, Tensor) -> Tensor
-        x_j = torch.index_select(x, 0, edge_index[1])
+        x_j = torch.index_select(x, 0, edge_index[1])#对输入数据按边的dst节点进行索引，有多少边，索引出来多少节点，有重复节点
         out = self.message(x_j, norm)
         out = scatter_add(out, edge_index[0], 0, None, dim_size=x.size(0))
         out = self.update(out)

@@ -16,8 +16,6 @@
 import torch
 
 from .num_nodes import maybe_num_nodes
-
-
 @torch.jit.script
 def contains_self_loops(edge_index):
     # type: (Tensor) -> bool
@@ -68,12 +66,12 @@ def add_remaining_self_loops(edge_index, edge_weight, fill_value=1, num_nodes=No
     row, col = edge_index[0], edge_index[1]
 
     mask = row != col
-    inv_mask = 1 - mask
+    inv_mask = 1 + mask.logical_not()
     loop_weight = torch.full(
         (num_nodes,),
         fill_value,
         dtype=None if edge_weight is None else edge_weight.dtype,
-        device=edge_index.device)
+        device=edge_index.device)#一个全1向量
 
     assert edge_weight.numel() == edge_index.size(1)
     loop_weight[row[inv_mask]] = edge_weight[inv_mask].view(-1)

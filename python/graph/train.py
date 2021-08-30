@@ -14,7 +14,7 @@
 #
 
 import os.path as osp
-
+import os
 import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Planetoid
@@ -22,24 +22,24 @@ from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 import numpy as np
 import random
+from time import perf_counter
 
 
 def train_gcn():
     dataset = 'Cora'
-    path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'data', dataset)
-    dataset = Planetoid(path, dataset, T.NormalizeFeatures())
+    path = osp.join(osp.dirname(osp.realpath('__file__')), 'data', dataset)
+    ## 加载数据集
+    dataset = Planetoid(path, dataset, transform=T.NormalizeFeatures())
     data = dataset[0]
-
     from gcn import GCN
 
     num_nodes = data.x.size(0)
     input_dim = data.x.size(1)
     hidden_dim = 16
     num_classes = 7
-
     model = GCN(input_dim, hidden_dim, num_classes)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.02, weight_decay=0)
-
+    t = perf_counter()
     for epoch in range(1, 2000):
         optimizer.zero_grad()
         output = model.forward_(data.x, data.edge_index)
@@ -48,7 +48,35 @@ def train_gcn():
         optimizer.step()
         acc = output.max(1)[1].eq(data.y).sum().item() / num_nodes
         print('epoch=%d loss=%f acc=%f' % (epoch, loss.item(), acc))
+    train_time = perf_counter()-t
+    print(train_time)
 
+def train_sgcn():
+    dataset = 'Cora'
+    path = osp.join(osp.dirname(osp.realpath('__file__')), 'data', dataset)
+    ## 加载数据集
+    dataset = Planetoid(path, dataset, transform=T.NormalizeFeatures())
+    data = dataset[0]
+
+    from sgcn import SGCN
+
+    num_nodes = data.x.size(0)
+    input_dim = data.x.size(1)
+    num_classes = 7
+
+    model = SGCN(input_dim, num_classes)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.02, weight_decay=0)
+    t = perf_counter()
+    for epoch in range(1, 2000):
+        optimizer.zero_grad()
+        output = model.forward_(data.x, data.edge_index)
+        loss = model.loss(output, data.y)
+        loss.backward()
+        optimizer.step()
+        acc = output.max(1)[1].eq(data.y).sum().item() / num_nodes
+        print('epoch=%d loss=%f acc=%f' % (epoch, loss.item(), acc))
+    train_time = perf_counter()-t
+    print(train_time)
 
 def mix_train_test(name, test_ratio):
     from torch_geometric.datasets import Entities
@@ -75,17 +103,18 @@ def train_rgcn():
     name = 'MUTAG'
     path = osp.join(
         osp.dirname(osp.realpath(__file__)), './', 'data', 'Entities', name)
-    dataset = Entities(path, name)
+    dataset = Entities(path, name)#下载数据集到path
     data = dataset[0]
-
+    print(data)
+    os.system("pause")
     from rgcn import RGCN
     x = torch.zeros(data.num_nodes, 16)
-    torch.nn.init.xavier_uniform_(x)
+    torch.nn.init.xavier_uniform_(x)#对x进行初始化
 
-    model = RGCN(x.size(1), 16, dataset.num_relations, 30, dataset.num_classes)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0005)
+    model = RGCN(x.size(1), 16, dataset.num_relations, 30, dataset.num_classes)#创建模型
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0005)#定义优化器内容
 
-    train_idx, test_idx, train_y, test_y = mix_train_test(name, 0.2)
+    train_idx, test_idx, train_y, test_y = mix_train_test(name, 0.2)#分离训练集和测试集
     print('train_size: {:03d}, test_size: {:03d}'.format(train_idx.size(0), test_idx.size(0)))
 
     def train():
@@ -105,6 +134,7 @@ def train_rgcn():
         pred = out[train_idx].max(1)[1]
         train_acc = pred.eq(train_y).sum().item() / train_y.size(0)
         return train_acc, test_acc
+    
 
     for epoch in range(1, 100):
         loss = train()
@@ -160,5 +190,6 @@ def download_data():
 
 if __name__ == '__main__':
     # mix_train_test()
-    train_rgcn()
+    train_gcn()
+    #train_sgcn()
     # download_data()
