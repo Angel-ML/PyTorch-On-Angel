@@ -235,29 +235,26 @@ void set_grads(JNIEnv *env, std::vector<torch::jit::IValue> &inputs,
                                inputs[i].toTensor().grad().data<float>());
     } else if (inputs[i].isTensorList()) {
       auto list = inputs[i].toTensorList();
-      if (list.get(0).grad().defined()) {
-        auto array = jni_map_get(env, params, ptrs[i].first);
-        if (env->IsInstanceOf(array, env->FindClass("[F"))) {
-          int start = 0;
-          for (size_t pos = 0; pos < list.size(); pos++) {
+      auto array = jni_map_get(env, params, ptrs[i].first);
+      if(env->IsInstanceOf(array, env->FindClass("[F"))) {
+        int start = 0;
+        for (size_t pos = 0; pos < list.size(); pos++) {
+          if (list.get(pos).grad().defined()) {
             int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-            env->SetFloatArrayRegion((jfloatArray)array, start, len,
-                                     list.get(pos).grad().data<float>());
+            env->SetFloatArrayRegion((jfloatArray)array, start, len, list.get(pos).grad().data<float>());
             start += len;
           }
-        } else {
-          for (size_t pos = 0; pos < list.size(); pos++) {
-            auto embedding_array = (jfloatArray)env->GetObjectArrayElement(
-                (jobjectArray)array, (jsize)pos);
-            int len = static_cast<int>(list.get(pos).view({-1}).size(0));
-            env->SetFloatArrayRegion(embedding_array, 0, len,
-                                     list.get(pos).grad().data<float>());
-            env->SetObjectArrayElement((jobjectArray)array, (jsize)pos,
-                                       embedding_array);
-          }
-          break;
         }
-      }
+      } else {
+        for (size_t pos = 0; pos < list.size(); pos++) {
+          if (list.get(pos).grad().defined()) {
+            auto embedding_array = (jfloatArray)env->GetObjectArrayElement((jobjectArray)array, (jsize)pos);
+            int len = static_cast<int>(list.get(pos).view({-1}).size(0));
+            env->SetFloatArrayRegion(embedding_array, 0, len, list.get(pos).grad().data<float>());
+            env->SetObjectArrayElement((jobjectArray)array, (jsize)pos, embedding_array);
+          }
+        }
+      }  
     }
   }
 }

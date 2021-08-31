@@ -65,7 +65,7 @@ object GraphSageExample {
     val validatePeriods = params.getOrElse("validatePeriods", "5").toInt
     val useSecondOrder = params.getOrElse("second", "true").toBoolean
     var useSharedSamples = params.getOrElse("useSharedSamples", "false").toBoolean
-    if (batchSize < 128) useSharedSamples = false
+    if (batchSize < 128 || fieldNum > 0) useSharedSamples = false
     val saveCheckpoint = params.getOrElse("saveCheckpoint", "false").toBoolean
     val numLabels = params.getOrElse("numLabels", "1").toInt // a multi-label classification task if numLabels > 1
     val batchSizeMultiple = params.getOrElse("batchSizeMultiple", "10").toInt

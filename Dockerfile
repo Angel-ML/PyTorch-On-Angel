@@ -31,7 +31,7 @@ RUN curl -fsSL --insecure -o /tmp/cmake.tar.gz https://cmake.org/files/v3.13/cma
 #  download libtorch  #
 #######################
 WORKDIR /opt
-ENV LIBTORCH_URL=https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.3.1%2Bcpu.zip
+ENV LIBTORCH_URL=https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcpu.zip
 RUN curl -fsSL --insecure -o libtorch.zip  $LIBTORCH_URL \
     && unzip -q libtorch.zip \
     && rm libtorch.zip
@@ -53,8 +53,8 @@ ENV PATH /opt/conda/bin/:$PATH
 
 RUN /opt/conda/bin/conda install -yq \
       -c pytorch \
-      pytorch=1.3.1 \
-      torchvision=0.4.0 \
+      pytorch=1.5.0 \
+      torchvision=0.6.0 \
       cpuonly=1.0  \
     && /opt/conda/bin/conda clean -yq --all
 
