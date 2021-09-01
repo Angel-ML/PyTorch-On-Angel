@@ -65,11 +65,22 @@ object MakeSparseBiFeature {
   }
 
   def makeFeature(start: Int, f: IntFloatVector, x: Array[Float]): Unit = {
-    val values = f.getStorage.getValues
-    var j = 0
-    while (j < values.length) {
-      x(start + j) = values(j)
-      j += 1
+    f.getStorage match {
+      case sorted: IntFloatSortedVectorStorage =>
+        val indices = sorted.getIndices
+        val values = sorted.getValues
+        var j = 0
+        while (j < indices.length) {
+          x(start + indices(j)) = values(j)
+          j += 1
+        }
+      case dense: IntFloatDenseVectorStorage =>
+        val values = dense.getValues
+        var j = 0
+        while (j < values.length) {
+          x(start + j) = values(j)
+          j += 1
+        }
     }
   }
 
