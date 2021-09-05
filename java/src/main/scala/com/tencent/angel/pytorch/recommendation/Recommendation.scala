@@ -19,6 +19,7 @@ package com.tencent.angel.pytorch.recommendation
 import com.tencent.angel.ml.math2.matrix.CooLongFloatMatrix
 import com.tencent.angel.pytorch.data.SampleParser
 import com.tencent.angel.pytorch.eval.Evaluation
+import com.tencent.angel.pytorch.eval.EvaluationM
 import com.tencent.angel.pytorch.model.TorchModelType
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.params._
@@ -34,7 +35,7 @@ import org.apache.spark.sql.{DataFrame, Row}
 
 class Recommendation(torchModelPath: String, val uid: String) extends Serializable
   with HasOptimizer with HasAsync with HasNumEpoch with HasBatchSize with HasTestRatio
-  with HasEvaluation with HasStorageLevel {
+  with HasEvaluation with HasNumLabels with HasStorageLevel {
 
   def this(torchModelPath: String) = this(torchModelPath, Identifiable.randomUID("Recommendation"))
 
@@ -98,10 +99,17 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     }
   }
 
-  def evaluate(model: RecommendPSModel, data: RDD[String]): Map[String, Double] = {
+  def evaluate(model: RecommendPSModel, data: RDD[String]): Map[String, String] = {
     val scores = predict(model, data).map(f => (f._1.toFloat, f._2))
-    import com.tencent.angel.pytorch.eval.Evaluation._
-    Evaluation.eval(getEvaluations, scores)
+    $(numLabels) match {
+      case 1 =>
+        import com.tencent.angel.pytorch.eval.Evaluation._
+        Evaluation.eval(getEvaluations, scores).map(f => (f._1, f._2.toString()))
+      case _ =>
+        import com.tencent.angel.pytorch.eval.EvaluationM._
+        EvaluationM.eval(getEvaluations, scores, $(numLabels))
+    }
+
   }
 
   def predict(model: RecommendPSModel, data: DataFrame): DataFrame = {
@@ -117,9 +125,9 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     data.sparkSession.createDataFrame(scores, schema)
   }
 
-  def predict(model: RecommendPSModel, data: RDD[String]): RDD[(String, Float)] = {
+  def predict(model: RecommendPSModel, data: RDD[String]): RDD[(Float, Float)] = {
 
-    def predictPartition(it: Iterator[String]): Iterator[(Array[String], Array[Float])] = {
+    def predictPartition(it: Iterator[String]): Iterator[(Array[Float], Array[Float])] = {
       it.sliding($(batchSize), $(batchSize))
         .map(f => predict(f.toArray, model))
     }
@@ -216,10 +224,10 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     loss * batchSize
   }
 
-  def predict(batch: Array[String], model: RecommendPSModel): (Array[String], Array[Float]) = {
+  def predict(batch: Array[String], model: RecommendPSModel): (Array[Float], Array[Float]) = {
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
-    val tuple3 = SampleParser.parsePredict(batch, torch.getType)
+    val tuple3 = SampleParser.parse(batch, torch.getType)
     val (coo, fields, targets) = (tuple3._1, tuple3._2, tuple3._3)
     val output = TorchModelType.withName(torch.getType) match {
       case TorchModelType.BIAS_WEIGHT =>
@@ -268,14 +276,15 @@ class Recommendation(torchModelPath: String, val uid: String) extends Serializab
     val weightInput = makeWeight(weight, batch)
     val embeddingInput = makeEmbedding(embedding, batch.getColIndices, model.getEmbeddingDim)
     val matsInput = makeMats(mats)
+    val multiForwardOut = $(numLabels)
     if (fields.isEmpty)
       torch.forward(batchSize, batch, biasInput, weightInput,
         embeddingInput, model.getEmbeddingDim,
-        matsInput, torch.getMatsSize)
+        matsInput, torch.getMatsSize, multiForwardOut)
     else
       torch.forward(batchSize, batch, biasInput, weightInput,
         embeddingInput, model.getEmbeddingDim,
-        matsInput, torch.getMatsSize, fields.get)
+        matsInput, torch.getMatsSize, fields.get, multiForwardOut)
   }
 
 }

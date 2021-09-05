@@ -50,16 +50,17 @@ public class SampleParser {
   private static Tuple2<CooLongFloatMatrix, float[]> parseLIBSVM(String[] lines) {
     LongArrayList rows = new LongArrayList();
     LongArrayList cols = new LongArrayList();
-    LongArrayList fields = null;
     FloatArrayList vals = new FloatArrayList();
-    float[] targets = new float[lines.length];
+    FloatArrayList targets = new FloatArrayList();
 
     int index = 0;
     for (int i = 0; i < lines.length; i++) {
       String[] parts = lines[i].split(" ");
-      float label = Float.parseFloat(parts[0]);
-      targets[i] = label;
-
+      String[] labels = parts[0].split("#");
+      for (int l = 0; l < labels.length; l += 1) {
+        float label = Float.parseFloat(labels[l]);
+        targets.add(label);
+      }
       for (int j = 1; j < parts.length; j++) {
         String[] kv = parts[j].split(":");
         long key = Long.parseLong(kv[0]) - 1;
@@ -75,8 +76,7 @@ public class SampleParser {
 
     CooLongFloatMatrix coo = MFactory.cooLongFloatMatrix(rows.toLongArray(),
             cols.toLongArray(), vals.toFloatArray(), null);
-
-    return new Tuple2<CooLongFloatMatrix, float[]>(coo, targets);
+    return new Tuple2<CooLongFloatMatrix, float[]>(coo, targets.toFloatArray());
   }
 
   private static Tuple3<CooLongFloatMatrix, long[], float[]> parseLIBFFM(String[] lines) {

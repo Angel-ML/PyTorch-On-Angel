@@ -34,6 +34,7 @@ public class TorchModel implements Serializable {
 
   // load library of torch and torch_angel
   static {
+    System.loadLibrary("torch");
     System.loadLibrary("torch_angel");
   }
 
@@ -239,6 +240,27 @@ public class TorchModel implements Serializable {
     params.put("mats", mats);
     params.put("mats_sizes", matSizes);
     params.put("fields", fields);
+    return Torch.forward(ptr, params, false);
+  }
+
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, int multiForwardOut) {
+    Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
+    params.put("embedding", embeddings);
+    params.put("embedding_dim", embeddingDim);
+    params.put("mats", mats);
+    params.put("mats_sizes", matSizes);
+    params.put("multi_forward_out", multiForwardOut);
+    return Torch.forward(ptr, params, false);
+  }
+
+  public float[] forward(int batchSize, CooLongFloatMatrix batch, float[] bias, float[] weights, float[] embeddings, int embeddingDim, float[] mats, int[] matSizes, long[] fields, int multiForwardOut) {
+    Map<String, Object> params = buildParams(batchSize, batch, bias, weights);
+    params.put("embedding", embeddings);
+    params.put("embedding_dim", embeddingDim);
+    params.put("mats", mats);
+    params.put("mats_sizes", matSizes);
+    params.put("fields", fields);
+    params.put("multi_forward_out", multiForwardOut);
     return Torch.forward(ptr, params, false);
   }
 
