@@ -49,6 +49,7 @@ object RecommendationExample {
     val torchOutputModelPath = params.getOrElse("torchOutputModelPath", "")
     val rowType = params.getOrElse("rowType", "T_FLOAT_DENSE")
     val evals = params.getOrElse("evals", "auc")
+    val numLabels = params.getOrElse("numLabels", "1").toInt
     val level = params.getOrElse("storageLevel", "memory_only").toUpperCase()
 
     val recommendation = new Recommendation(torchModelPath)
@@ -60,6 +61,7 @@ object RecommendationExample {
     recommendation.setDecay(decay)
     recommendation.setAsync(async)
     recommendation.setEvaluations(evals)
+    recommendation.setNumLabels(numLabels)
     recommendation.setStorageLevel(StorageLevel.fromString(level))
 
     var numPartitions = start(mode)

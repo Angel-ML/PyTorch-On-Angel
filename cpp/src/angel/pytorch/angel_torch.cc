@@ -268,6 +268,12 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
     std::vector<torch::jit::IValue> inputs;
     std::vector<std::pair<std::string, void *>> ptrs;
 
+    int multi_forward_out = 1;
+    if (angel::jni_map_contain(env, jparams, "multi_forward_out")) {
+        multi_forward_out =
+            angel::jni_map_get_int(env, jparams, "multi_forward_out");
+    }
+
     int batch_size = angel::jni_map_get_int(env, jparams, "batch_size");
     // data inputs
     inputs.emplace_back(batch_size);
@@ -282,7 +288,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
         }
         auto output = ptr->serving_forward(inputs);
         auto output_ptr = output.data_ptr();
-        DEFINE_JFLOATARRAY(output_ptr, batch_size);
+        DEFINE_JFLOATARRAY(output_ptr, batch_size * multi_forward_out);
 
         // release java arrays
         release_array(env, ptrs, jparams);
@@ -291,7 +297,7 @@ JNIEXPORT jfloatArray JNICALL Java_com_tencent_angel_pytorch_Torch_forward
         add_inputs(env, &inputs, &ptrs, jparams, ptr->get_type());
         auto output = ptr->forward(inputs).toTensor();
         auto output_ptr = output.data_ptr();
-        DEFINE_JFLOATARRAY(output_ptr, batch_size);
+        DEFINE_JFLOATARRAY(output_ptr, batch_size * multi_forward_out);
 
         // release java arrays
         release_array(env, ptrs, jparams);
