@@ -27,17 +27,18 @@ class MMOE(torch.nn.Module):
         self.bias = torch.nn.Parameter(torch.zeros(1, 1))
         # weights
         self.weights = torch.nn.Parameter(torch.zeros(1, 1))
-        # embeddings
-        # self.embedding = torch.nn.Parameter(torch.zeros(embedding_dim))
+
 
         # expert_weight
-        self.w_expert = [torch.nn.Parameter(torch.zeros(input_dim, experts_hidden)),torch.nn.Parameter(torch.zeros(experts_hidden,experts_out))]*experts_num
+        self.w_expert = [torch.nn.Parameter(torch.zeros(input_dim, experts_hidden)),torch.nn.Parameter(torch.zeros(1, experts_hidden)), \
+                        torch.nn.Parameter(torch.zeros(experts_hidden,experts_out)),torch.nn.Parameter(torch.zeros(1, experts_out))]*experts_num
 
         # gates_weight
         self.w_gates = [torch.nn.Parameter(torch.zeros(input_dim, experts_num))]*tasks
 
         # tower_weight
-        self.w_towers = [torch.nn.Parameter(torch.zeros(experts_out, towers_hidden)),torch.nn.Parameter(torch.zeros(towers_hidden,1))]*tasks
+        self.w_towers = [torch.nn.Parameter(torch.zeros(experts_out, towers_hidden)),torch.nn.Parameter(torch.zeros(1, towers_hidden)),\
+                         torch.nn.Parameter(torch.zeros(towers_hidden,1)),torch.nn.Parameter(torch.zeros(1, 1))]*tasks
 
         # mats
         self.mats = self.w_expert + self.w_gates+self.w_towers
@@ -47,58 +48,51 @@ class MMOE(torch.nn.Module):
             torch.nn.init.xavier_uniform_(i)
 
 
-        """Angel Params"""
-        # bias
-        self.bias = torch.nn.Parameter(torch.zeros(1, 1))
-        # weights
-        self.weights = torch.nn.Parameter(torch.zeros(1, 1))
-
-
     def forward_(self,batch_size, index, feats, values,mats):
         # type: (int, Tensor, Tensor, Tensor,List[Tensor]) -> Tensor
         index = index.view(-1)
         values = values.view(1, -1)
 
         # get the experts output
-        w_expert = mats[0:self.experts_num*2]
-        # print("======w_expert=======")
-        # print(w_expert)
+        w_expert = mats[0:self.experts_num*4]
         expers_outs = []
-        for w_expert0,w_expert1 in zip(w_expert[0::2], w_expert[1::2]):
+        for w_expert0,b_expert0,w_expert1,b_expert1 in zip(w_expert[0::4], w_expert[1::4],w_expert[2::4],w_expert[3::4]):
             w_expert0 = F.embedding(feats, w_expert0)
             srcs = w_expert0.mul(values.view(-1,1)).transpose_(0,1)
-            expert_out = torch.zeros(batch_size,self.experts_hidden, dtype=torch.float32)
+            expert_out = torch.zeros(self.experts_hidden,batch_size, dtype=torch.float32)
             index_expert = index.repeat(self.experts_hidden).view(self.experts_hidden, -1)
-            expert_out.scatter_add_(1, index_expert, srcs)
+            expert_out.scatter_add_(1, index_expert, srcs).transpose_(0,1)
+            expert_out = expert_out + b_expert0
             expert_out = torch.relu(expert_out)
-            expert_out = expert_out @ expert_out
+            expert_out = expert_out @ w_expert1
+            expert_out = expert_out + b_expert1
             expers_outs.append(expert_out)
 
         expers_out_tensor = torch.stack(expers_outs)
 
         #get the gates output
         # w_gates =  mats.pop(self.tasks)
-        w_gates = mats[self.experts_num*2:self.experts_num*2+self.tasks]
-        srcs = [ F.embedding(feats,w_gate).mul(values.view(-1,1)).transpose_(0,1) for w_gate in w_gates]
+        w_gates = mats[self.experts_num*4:self.experts_num*4+self.tasks]
+        srcs = [F.embedding(feats,w_gate).mul(values.view(-1,1)).transpose_(0,1) for w_gate in w_gates]
         index_gate = index.repeat(self.experts_num).view(self.experts_num, -1)
-        gates_out = torch.zeros(batch_size,self.experts_num, dtype=torch.float32)
-        gates_outs = [gates_out.scatter_add_(0,index_gate,src) for src in srcs]
+        gates_out = torch.zeros(self.experts_num,batch_size, dtype=torch.float32)
+        gates_outs = [gates_out.scatter_add_(1,index_gate,src) for src in srcs]
         gates_outs = [self.softmax(gates_out)for gates_out in gates_outs]
 
-        #get the towers_input
-        towers_input = [g.t().unsqueeze(2).expand(-1, -1, self.experts_out) * expers_out_tensor for g in gates_out]
+        # towers_input = []
+        towers_input = [(g.unsqueeze(2).expand(-1, -1, self.experts_out)) * expers_out_tensor for g in gates_outs]
         towers_input = [torch.sum(ti, dim=0) for ti in towers_input]
 
         # get the final output from the towers
-        w_towers = mats[self.experts_num*2+self.tasks:]
+        w_towers = mats[self.experts_num*4+self.tasks:]
         final_output = []
-        for w_tower0, w_tower1,i in zip(w_towers[0::2], w_towers[1::2],range(self.tasks)):
-            srcs = w_tower0.view(1,-1).mul(towers_input[i].view(1, -1)).view(-1)
-            tower_out = torch.zeros(batch_size, dtype=torch.float32)
-            tower_out.scatter_add_(0, index, srcs)
+        for w_tower0,b_tower0, w_tower1,b_tower1,i in zip(w_towers[0::4], w_towers[1::4],w_towers[2::4], w_towers[3::4],range(self.tasks)):
+            tower_out = towers_input[i] @ w_tower0
+            tower_out = tower_out + b_tower0
             tower_out = torch.relu(tower_out)
-            srcs = w_tower1.view(1,-1).mul(tower_out).view(-1)
-            tower_out.scatter_add_(0, index, srcs)
+            tower_out = tower_out @ w_tower1
+            tower_out = tower_out + b_tower1
+            tower_out = torch.sigmoid(tower_out)
             final_output.append(tower_out)
 
         # get the output of the towers, and stack them
@@ -170,3 +164,4 @@ if __name__ == "__main__":
     main()
 
 # python mmoe.py --input_dim 5 --experts_num 3 --experts_out 4 --experts_hidden 2 --towers_hidden 2  --tasks 2
+# train.py  model = mmoe.MMOE(dim,3,4,2,2,1)
