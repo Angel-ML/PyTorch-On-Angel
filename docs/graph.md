@@ -828,6 +828,289 @@ Here we give an example of using IGMC over pytorch on angel.
     - The model file, igmc\_ml\_class.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
 
 
+### Example of GAMLP
+
+[GAMLP](https://arxiv.org/pdf/2108.10097.pdf) Following the routine of decoupled GNNs, the feature propagation in GAMLP is executed during pre-computation, which helps it maintain high scalability.
+
+GAMLP contains two independent modules:
+
+    1.GAMLP-aggregator, feature propagation aggregation module. This module only needs to be run once in the preprocessing stage as the feature input for subsequent GNN model training; the module can also be run as an independent component as a feature propagation aggregation component common to other GNN algorithms
+    2.GAMLP-training, the GNN model training module, loads the features of the aggregation module for training. In this training stage, it is no longer necessary to do node sampling, pulling node feature aggregation and other communication overhead operations, which greatly improves the model training efficiency.
+
+Here we give an example of using GAMLP over pytorch on angel.
+
+#### GAMLP-aggregator
+1. **Generate pytorch sciprt model**
+   First, go to directory of python/graph and execute the following command:
+    ```$xslt
+    python aggregator.py --aggregation_type mean --output_file aggregator.pt
+    ```
+   This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of GAMLP-aggregator. After that, you will obtain a model file named "aggregator.pt". Here we use the Cora dataset as an example, where the feature dimension for each node is 1433 with 7 different classes.  
+   Detailed parameter introduction reference [Python Model Parameters](./public_parameters_gnn.md)
+
+2. **Preparing input data**
+   There are two inputs required for GAMLP-aggregator, including the edge table and the node feature table.
+
+   The detail info see [Data Format](./data_format_gnn.md)
+
+2. **Submit model to cluster**
+   After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
+
+   **dense/low-sparse data**:
+
+   ```$xslt
+   source ./spark-on-angel-env.sh  
+    $SPARK_HOME/bin/spark-submit \
+    --master yarn-cluster\
+    --conf spark.hadoop.hadoop.job.ugi=tdwadmin,supergroup\
+    --conf spark.tdw.authentication=usp:usp@all2012\
+    --conf spark.yarn.allocation.am.maxMemory=55g \
+    --conf spark.yarn.allocation.executor.maxMemory=55g \
+    --conf spark.driver.maxResultSize=20g \
+    --conf spark.kryoserializer.buffer.max=2000m\
+    --conf spark.submitter=lucytjia \
+    --conf spark.ps.instances=20 \
+    --conf spark.ps.cores=20 \
+    --conf spark.ps.jars=$SONA_ANGEL_JARS \
+    --conf spark.ps.memory=10g \
+    --conf spark.ps.log.level=INFO \
+    --conf spark.hadoop.angel.ps.jvm.direct.factor.use.direct.buff=0.20 \
+    --conf spark.hadoop.angel.ps.backup.interval.ms=2000000000 \
+    --conf spark.hadoop.angel.netty.matrixtransfer.max.message.size=209715200 \
+    --conf spark.hadoop.angel.matrixtransfer.request.timeout.ms=240000 \
+    --conf spark.hadoop.angel.ps.request.resource.use.minibatch=true \
+    --conf spark.hadoop.angel.ps.router.type=range \
+    --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+    --conf spark.driver.extraLibraryPath=./torch/torch-lib\
+    --conf spark.executorEnv.OMP_NUM_THREADS=2 \
+    --conf spark.executorEnv.MKL_NUM_THREADS=2 \
+    --queue $queue \
+    --name "haggregator" \
+    --jars $SONA_SPARK_JARS  \
+    --archives $torch#torch\
+    --files aggregator.pt\
+    --driver-memory 45g \
+    --num-executors 50 \
+    --executor-cores 20 \
+    --executor-memory 10g \
+    --class com.tencent.angel.pytorch.examples.supervised.cluster.AggregatorExample \
+    ./pytorch-on-angel-${VERSION}.jar \ # jar from Compiling java submodule
+    edgePath:$edgePath featurePath:$featurePath hops:4 sampleMethod:aliasTable \
+    upload_torchModelPath:aggregator.pt featureDim:1433 sep:tab \
+    numPartitions:100 format:dense samples:10 batchSize:128 numBatchInit:128 \
+    predictOutputPath:$predictOutputPath periods:10 \
+    checkpointInterval:10 psNumPartition:100 useBalancePartition:false
+   ```  
+#### GAMLP-training
+1. **Generate pytorch sciprt model**
+   First, go to directory of python/graph and execute the following command:
+    ```$xslt
+    python gamlp.py --input_dim 1433 --hidden_dim 128 --output_dim 7 --hops 4 --output_file gamlp.pt
+    ```
+   Note that the --hops must be same with the GAMLP-aggregator module.
+   This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of GAMLP-aggregator. After that, you will obtain a model file named "aggregator.pt". Here we use the Cora dataset as an example, where the feature dimension for each node is 1433 with 7 different classes.  
+   Detailed parameter introduction reference [Python Model Parameters](./public_parameters_gnn.md)
+
+2. **Preparing input data**
+   There are three inputs required for GAMLP-training, including the edge table, the node feature table and the node label talbe.
+   Note that the feature comes from the predictOutputPath of the previous GAMLP-aggregator module.
+   The detail info see [Data Format](./data_format_gnn.md)
+
+2. **Submit model to cluster**
+   After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
+
+   **dense/low-sparse data**:
+
+   ```$xslt
+    --master yarn-cluster \
+    --conf spark.hadoop.hadoop.job.ugi=tdwadmin,supergroup\
+    --conf spark.tdw.authentication=usp:usp@all2012\
+    --conf spark.yarn.allocation.am.maxMemory=55g \
+    --conf spark.yarn.allocation.executor.maxMemory=55g \
+    --conf spark.driver.maxResultSize=20g \
+    --conf spark.kryoserializer.buffer.max=2000m\
+    --conf spark.submitter=lucytjia \
+    --conf spark.ps.instances=2 \
+    --conf spark.ps.cores=2 \
+    --conf spark.ps.jars=$SONA_ANGEL_JARS \
+    --conf spark.ps.memory=10g \
+    --conf spark.ps.log.level=INFO \
+    --conf spark.hadoop.angel.ps.jvm.direct.factor.use.direct.buff=0.20 \
+    --conf spark.hadoop.angel.ps.backup.interval.ms=2000000000 \
+    --conf spark.hadoop.angel.netty.matrixtransfer.max.message.size=209715200 \
+    --conf spark.hadoop.angel.matrixtransfer.request.timeout.ms=240000 \
+    --conf spark.hadoop.angel.ps.request.resource.use.minibatch=true \
+    --conf spark.hadoop.angel.ps.router.type=hash \
+    --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+    --conf spark.driver.extraLibraryPath=./torch/torch-lib\
+    --conf spark.executorEnv.OMP_NUM_THREADS=2 \
+    --conf spark.executorEnv.MKL_NUM_THREADS=2 \
+    --queue $queue \
+    --name "gamlp" \
+    --jars $SONA_SPARK_JARS  \
+    --archives $torch#torch\
+    --files gamlp.pt\
+    --driver-memory 45g \
+    --num-executors 2 \
+    --executor-cores 2 \
+    --executor-memory 10g \
+    --class com.tencent.angel.pytorch.examples.supervised.cluster.GAMLPExample \
+    ./pytorch-on-angel-${VERSION}.jar \
+    edgePath:$edgePath featurePath:$featurePath labelPath:$labelPath hops:4\
+    featureDim:1433 sep:tab labelsep:tab stepSize:0.001\
+    optimizer:adam numEpoch:100 testRatio:0.4 validatePeriods:1 evals:acc,f1 \
+    numPartitions:10 format:dense samples:10 batchSize:128 numBatchInit:128 \
+    embeddingPath:$output periods:10 outputModelPath:$outputModelPath \
+    checkpointInterval:10 predictOutputPath:$predictOutputPath psNumPartition:10 useBalancePartition:false
+   ``` 
+   Here we give a short description for the parameters in the submit script. Detailed parameters and the output result see [details](./public_parameters_gnn.md)
+
+   **Notes:**
+    - The model file, aggregator.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
+    - The --hops must be same in all parameter settings.
+
+
+
+### Example of HGAMLP
+
+HGAMLP is an extension of GAMLP for heterogeneous graphs, it contains two independent modules:
+
+    1.HGAMLP-aggregator, Feature propagation aggregation module for heterogeneous graphs. According to the metapaths passed in by the user, aggregate different types of nodes, and output the aggregated features of each type of nodes.
+    2.HGAMLP-training, the GNN model training module, which is same as GAMLP-training.
+
+Here we give an example of using HGAMLP over pytorch on angel.
+
+#### GAMLP-aggregator
+1. **Generate pytorch sciprt model**
+   First, go to directory of python/graph and execute the following command:
+    ```$xslt
+    python aggregator.py --aggregation_type mean --output_file aggregator.pt
+    ```
+   This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of GAMLP-aggregator. After that, you will obtain a model file named "aggregator.pt". Here we use the Cora dataset as an example, where the feature dimension for each node is 1433 with 7 different classes.  
+   Detailed parameter introduction reference [Python Model Parameters](./public_parameters_gnn.md)
+
+2. **Preparing input data**
+   There are two inputs required for HGAMLP-aggregator, including the edge table and the node feature table.
+
+   The detail info see [Data Format](./data_format_gnn.md)
+
+2. **Submit model to cluster**
+   After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
+
+   **dense/low-sparse data**:
+
+   ```$xslt
+   source ./spark-on-angel-env.sh  
+    $SPARK_HOME/bin/spark-submit \
+    --master yarn-cluster\
+    --conf spark.hadoop.hadoop.job.ugi=tdwadmin,supergroup\
+    --conf spark.tdw.authentication=usp:usp@all2012\
+    --conf spark.yarn.allocation.am.maxMemory=55g \
+    --conf spark.yarn.allocation.executor.maxMemory=55g \
+    --conf spark.driver.maxResultSize=20g \
+    --conf spark.kryoserializer.buffer.max=2000m\
+    --conf spark.submitter=lucytjia \
+    --conf spark.ps.instances=20 \
+    --conf spark.ps.cores=20 \
+    --conf spark.ps.jars=$SONA_ANGEL_JARS \
+    --conf spark.ps.memory=10g \
+    --conf spark.ps.log.level=INFO \
+    --conf spark.hadoop.angel.ps.jvm.direct.factor.use.direct.buff=0.20 \
+    --conf spark.hadoop.angel.ps.backup.interval.ms=2000000000 \
+    --conf spark.hadoop.angel.netty.matrixtransfer.max.message.size=209715200 \
+    --conf spark.hadoop.angel.matrixtransfer.request.timeout.ms=240000 \
+    --conf spark.hadoop.angel.ps.request.resource.use.minibatch=true \
+    --conf spark.hadoop.angel.ps.router.type=range \
+    --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+    --conf spark.driver.extraLibraryPath=./torch/torch-lib\
+    --conf spark.executorEnv.OMP_NUM_THREADS=2 \
+    --conf spark.executorEnv.MKL_NUM_THREADS=2 \
+    --queue $queue \
+    --name "haggregator" \
+    --jars $SONA_SPARK_JARS  \
+    --archives $torch#torch\
+    --files aggregator.pt\
+    --driver-memory 45g \
+    --num-executors 50 \
+    --executor-cores 20 \
+    --executor-memory 10g \
+    --class com.tencent.angel.pytorch.examples.supervised.cluster.HeteAggregatorExample  \
+    ./pytorch-on-angel-${VERSION}.jar \ # jar from Compiling java submodule
+    edgePaths:$edgePaths featurePaths:$featurePaths metapaths:$metapaths isWeighted:false \
+    upload_torchModelPath:aggregator.pt sep:tab featureSep:tab featureDims:$featureDims aggregator_in_scala:true \
+    numPartitions:2 format:dense samples:10 batchSize:128 numBatchInit:128 useWeightedAggregate:true \
+    embeddingOutputPaths:$embeddingOutputPaths periods:10 sampleMethod:randm \
+    checkpointInterval:10 psNumPartition:2 useBalancePartition:false
+   ```  
+
+#### HGAMLP-training
+1. **Generate pytorch sciprt model**
+   First, go to directory of python/graph and execute the following command:
+    ```$xslt
+    python gamlp.py --input_dim 1433 --hidden_dim 128 --output_dim 7 --hops 4 --output_file gamlp.pt
+    ```
+   Note that the --hops must be same with the HGAMLP-aggregator metapaths length.
+   This script utilizes [TorchScript](https://pytorch.org/docs/stable/jit.html) to generate a model file which contains the dataflow graph of GAMLP-aggregator. After that, you will obtain a model file named "aggregator.pt". Here we use the Cora dataset as an example, where the feature dimension for each node is 1433 with 7 different classes.  
+   Detailed parameter introduction reference [Python Model Parameters](./public_parameters_gnn.md)
+
+2. **Preparing input data**
+   There are three inputs required for GAMLP-training, including the edge table, the node feature table and the node label talbe.
+   Note that the feature comes from the predictOutputPath of the previous GAMLP-aggregator module.
+   The detail info see [Data Format](./data_format_gnn.md)
+
+2. **Submit model to cluster**
+   After obtaining the model file and the inputs, we can submit a task through [Spark on Angel](https://github.com/Angel-ML/angel/blob/master/docs/tutorials/spark_on_angel_quick_start_en.md).
+
+   **dense/low-sparse data**:
+
+   ```$xslt
+    --master yarn-cluster \
+    --conf spark.hadoop.hadoop.job.ugi=tdwadmin,supergroup\
+    --conf spark.tdw.authentication=usp:usp@all2012\
+    --conf spark.yarn.allocation.am.maxMemory=55g \
+    --conf spark.yarn.allocation.executor.maxMemory=55g \
+    --conf spark.driver.maxResultSize=20g \
+    --conf spark.kryoserializer.buffer.max=2000m\
+    --conf spark.submitter=lucytjia \
+    --conf spark.ps.instances=2 \
+    --conf spark.ps.cores=2 \
+    --conf spark.ps.jars=$SONA_ANGEL_JARS \
+    --conf spark.ps.memory=10g \
+    --conf spark.ps.log.level=INFO \
+    --conf spark.hadoop.angel.ps.jvm.direct.factor.use.direct.buff=0.20 \
+    --conf spark.hadoop.angel.ps.backup.interval.ms=2000000000 \
+    --conf spark.hadoop.angel.netty.matrixtransfer.max.message.size=209715200 \
+    --conf spark.hadoop.angel.matrixtransfer.request.timeout.ms=240000 \
+    --conf spark.hadoop.angel.ps.request.resource.use.minibatch=true \
+    --conf spark.hadoop.angel.ps.router.type=hash \
+    --conf spark.executor.extraLibraryPath=./torch/torch-lib \
+    --conf spark.driver.extraLibraryPath=./torch/torch-lib\
+    --conf spark.executorEnv.OMP_NUM_THREADS=2 \
+    --conf spark.executorEnv.MKL_NUM_THREADS=2 \
+    --queue $queue \
+    --name "gamlp" \
+    --jars $SONA_SPARK_JARS  \
+    --archives $torch#torch\
+    --files gamlp.pt\
+    --driver-memory 45g \
+    --num-executors 2 \
+    --executor-cores 2 \
+    --executor-memory 10g \
+    --class com.tencent.angel.pytorch.examples.supervised.GAMLPExample \
+    ./pytorch-on-angel-${VERSION}.jar \
+    edgePath:$edgePath featurePath:$featurePath labelPath:$labelPath hops:4\
+    featureDim:1433 sep:tab labelsep:tab stepSize:0.001\
+    optimizer:adam numEpoch:100 testRatio:0.4 validatePeriods:1 evals:acc,f1 \
+    numPartitions:10 format:dense samples:10 batchSize:128 numBatchInit:128 \
+    embeddingPath:$output periods:10 outputModelPath:$outputModelPath \
+    checkpointInterval:10 predictOutputPath:$predictOutputPath psNumPartition:10 useBalancePartition:false
+   ``` 
+   Here we give a short description for the parameters in the submit script. Detailed parameters and the output result see [details](./public_parameters_gnn.md)
+
+   **Notes:**
+    - The model file, aggregator.pt and gamlp.pt, should be uploaded to Spark Driver and each Executor. Therefore, we need use ``--files`` to upload the model file.
+    - The --hops must be same in all parameter settings.
+
 ### FAQ
 
 1. If you want to use GAT or HGAT, pytorch >= v1.5.0.
