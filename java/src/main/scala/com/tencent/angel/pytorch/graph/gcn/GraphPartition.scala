@@ -174,7 +174,8 @@ class GraphAdjTypePartition(index: Int,
                             keys: Array[Long],
                             indptr: Array[Int],
                             neighbors: Array[Long],
-                            types: Array[Int]) extends GraphAdjPartition(index, keys, indptr, neighbors) {
+                            types: Array[Int],
+                            weights: Array[Float]=Array()) extends GraphAdjPartition(index, keys, indptr, neighbors) {
   override
   def init(model: GNNPSModel, numBatch: Int): Int = {
     model.initNeighbors(keys, indptr, neighbors, types, numBatch)
@@ -213,6 +214,27 @@ class GraphAdjTypePartition(index: Int,
     }
     new HANPartition(index, keys, indptr, neighbors, types,
       trainIdx, trainLabels, testIdx, testLabels, torchModelPath, itemTypes, useSecondOrder)
+  }
+
+  def toSemiHAggregatorPartition(model: GNNPSModel, torchModelPath: String, useSecondOrder: Boolean,
+                                 testRatio: Float, numLabels: Int, isTraining: Boolean = true): HAggregatorPartition = {
+    val (trainIdx, testIdx, trainLabels, testLabels) = if (isTraining) {
+      if (numLabels > 1) {
+        splitTrainTestM(model, testRatio)
+      } else {
+        if (model.nnzTestLabels() == 0) {
+          val temp = splitTrainTest(model, testRatio)
+          (temp._1, temp._2, temp._3.map(Array(_)), temp._4.map(Array(_)))
+        } else {
+          val temp = getTrainTest(model)
+          (temp._1, temp._2, temp._3.map(Array(_)), temp._4.map(Array(_)))
+        }
+      }
+    } else {
+      (null, null, null, null)
+    }
+    new HAggregatorPartition(index, keys, indptr, neighbors, types, weights,
+      trainIdx, trainLabels, testIdx, testLabels, torchModelPath, useSecondOrder)
   }
 }
 
@@ -377,6 +399,21 @@ class GraphAdjEdgePartition(index: Int,
   }
 }
 
+
+private[gcn]
+class GraphAdjWeightedTypePartition(index: Int,
+                            keys: Array[Long],
+                            indptr: Array[Int],
+                            neighbors: Array[Long],
+                            types: Array[Int],
+                            weights: Array[Float]) extends GraphAdjTypePartition(index, keys, indptr, neighbors, types) {
+  override
+  def init(model: GNNPSModel, numBatch: Int): Int = {
+    model.initNeighbors(keys, indptr, neighbors, types, numBatch)
+    0
+  }
+}
+
 private[gcn]
 class NodeFeaturePartition(index: Int,
                            keys: Array[Long],
@@ -468,6 +505,34 @@ object GraphAdjWeightedPartition {
       indptr.toIntArray,
       neighbors.toLongArray,
       weights.toFloatArray)
+  }
+}
+
+object GraphAdjWeightedTypePartition {
+  def apply(index: Int, iterator: Iterator[(Long, Iterable[(Long, Float, Int)])], hasWeighted: Boolean=false, hasUseWeightedAggregate: Boolean=false): GraphAdjWeightedTypePartition = {
+    val indptr = new IntArrayList()
+    val keys = new LongArrayList()
+    val neighbors = new LongArrayList()
+    val types = new IntArrayList()
+    val weights_ = new FloatArrayList()
+
+    indptr.add(0)
+    while (iterator.hasNext) {
+      val entry = iterator.next()
+      val (node, ns) = (entry._1, entry._2)
+      for ((n, w, t) <- ns) {
+        neighbors.add(n)
+        weights_.add(w)
+        types.add(t)
+      }
+      indptr.add(neighbors.size())
+      keys.add(node)
+    }
+
+    new GraphAdjWeightedTypePartition(index, keys.toLongArray,
+      indptr.toIntArray,
+      neighbors.toLongArray,
+      types.toIntArray, weights_.toFloatArray)
   }
 }
 

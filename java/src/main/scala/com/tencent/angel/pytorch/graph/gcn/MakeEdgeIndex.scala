@@ -18,13 +18,13 @@ package com.tencent.angel.pytorch.graph.gcn
 
 import java.util
 import java.util.Random
-
 import com.tencent.angel.graph.client.psf.sample.sampleneighbor.SampleType
 import com.tencent.angel.ml.math2.storage.IntFloatDenseVectorStorage
 import com.tencent.angel.ml.math2.vector.IntFloatVector
 
 import scala.collection.JavaConversions._
 import it.unimi.dsi.fastutil.floats.FloatArrayList
+import it.unimi.dsi.fastutil.ints.IntArrays
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, Long2ObjectOpenHashMap, LongArrayList, LongArrays, LongOpenHashSet}
 
 import scala.collection.mutable.ArrayBuffer
@@ -795,6 +795,99 @@ object MakeEdgeIndex {
       edgeIndex(i + keys.length) = index.get(keys(i))
     }
     edgeIndex
+  }
+
+
+  /*
+  Make edge Index for algorithms with edge types and edge weights, for example HeteAggregator.
+  There are two major differences.
+  1. The returned structure includes a weight array.
+  2. We add self-loops
+ */
+  def makeEdgeIndex(batchIdx: Array[Int],
+                    keys: Array[Long],
+                    indptr: Array[Int],
+                    neighbors: Array[Long],
+                    weights: Array[Float],
+                    types: Array[Int],
+                    srcs: LongArrayList,
+                    dsts: LongArrayList,
+                    edgeTypes: LongArrayList,
+                    edgeWeights: FloatArrayList,
+                    batchKeys: LongOpenHashSet,
+                    index: Long2IntOpenHashMap,
+                    numSample: Int,
+                    model: GNNPSModel,
+                    selfLoop: Boolean=false,
+                    hasUseWeightedAggregate: Boolean=false): (Array[Long], Array[Long], Array[Float]) = {
+
+    val (first, firstTypes, firstWeights, firstKeys) = makeFirstOrderEdgeIndex(
+      batchIdx, keys, indptr, neighbors, weights, types,
+      srcs, dsts, edgeTypes, edgeWeights, batchKeys, index, numSample, selfLoop, hasUseWeightedAggregate)
+
+    (first, firstTypes, firstWeights)
+  }
+
+  /*
+  Make edge Index for graphs whose edges have different types and different weights.
+ */
+  private
+  def makeFirstOrderEdgeIndex(batchIdx: Array[Int],
+                              keys: Array[Long],
+                              indptr: Array[Int],
+                              neighbors: Array[Long],
+                              weights: Array[Float],
+                              types: Array[Int],
+                              srcs: LongArrayList,
+                              dsts: LongArrayList,
+                              edgeTypes: LongArrayList,
+                              edgeWeights: FloatArrayList,
+                              batchKeys: LongOpenHashSet,
+                              index: Long2IntOpenHashMap,
+                              numSample: Int,
+                              selfLoop: Boolean=false,
+                              hasUseWeightedAggregate: Boolean=false): (Array[Long], Array[Long], Array[Float], LongOpenHashSet) = {
+    val random = new Random()
+    val firstKeys = new LongOpenHashSet()
+    for (idx <- batchIdx) {
+      val key = keys(idx)
+      val keyIndex = index.get(key)
+      if (selfLoop){
+        srcs.add(keyIndex)
+        dsts.add(keyIndex)
+        edgeTypes.add(-1)
+        if (hasUseWeightedAggregate){
+          edgeWeights.add(1.0f)
+        }
+      }
+      val len = indptr(idx + 1) - indptr(idx)
+
+      var count = 0
+      val indexs = (indptr(idx) until indptr(idx + 1)).toArray
+      val size = if (len < numSample || numSample < 0) len else {
+        IntArrays.shuffle(indexs, 0, indexs.length, random)
+        numSample
+      }
+
+      while (count < size) {
+        val n = neighbors(indexs(count))
+        val j = indexs(count)
+
+        if (!batchKeys.contains(n))
+          firstKeys.add(n)
+        if (!index.containsKey(n))
+          index.put(n, index.size())
+        srcs.add(keyIndex)
+        dsts.add(index.get(n))
+        edgeTypes.add(types(j))
+        if (hasUseWeightedAggregate){
+          edgeWeights.add(weights(j))
+        }
+
+        count += 1
+      }
+    }
+    (makeEdgeIndexFromSrcDst(srcs, dsts), edgeTypes.toLongArray, edgeWeights.toFloatArray, firstKeys)
   }
 
 }
