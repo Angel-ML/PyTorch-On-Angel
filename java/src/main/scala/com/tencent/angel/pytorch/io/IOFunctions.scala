@@ -129,4 +129,13 @@ object IOFunctions {
     df
   }
 
+  def parseSep(sep: String): String = {
+    sep match {
+      case "space" => " "
+      case "comma" => ","
+      case "tab" => "\t"
+      case "colon" => ":"
+      case "bar" => "|"
+    }
+  }
 }

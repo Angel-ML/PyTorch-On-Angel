@@ -18,6 +18,7 @@
 package com.tencent.angel.pytorch.data;
 
 import com.tencent.angel.exception.AngelException;
+import com.tencent.angel.graph.data.Feature;
 import com.tencent.angel.ml.math2.MFactory;
 import com.tencent.angel.ml.math2.VFactory;
 import com.tencent.angel.ml.math2.matrix.CooLongFloatMatrix;
@@ -322,5 +323,15 @@ public class SampleParser {
     }
 
     return vals;
+  }
+
+  public static Feature parseEmbedding(String line, String sep) {
+    String[] parts = line.split(sep);
+    float[] vals = new float[parts.length];
+    for (int i = 0; i < parts.length; i++) {
+      vals[i] = Float.parseFloat(parts[i]);
+    }
+
+    return new Feature(VFactory.denseFloatVector(vals));
   }
 }
