@@ -265,6 +265,18 @@ public:
 
   std::string get_name() { return get_string("get_name"); }
 
+  std::string get_node_types() {
+      return module_.get_attribute("get_node_types").toString()->string();
+    }
+
+  std::string get_edge_types() {
+      return module_.get_attribute("get_edge_types").toString()->string();
+    }
+
+  std::string get_schame() {
+      return module_.get_attribute("get_schema").toString()->string();
+    }
+
 #ifndef LIBTORCH_VERSION_LATEST
   // iter for module and sub-module struct and get all parameter tensors
   void geten_module_iters(torch::jit::script::Module m_,
