@@ -52,9 +52,6 @@ object AggregatorExample {
     conf.set("spark.executor.extraLibraryPath", "./torch/torch-lib")
     conf.set("spark.executorEnv.OMP_NUM_THREADS", "2")
     conf.set("spark.executorEnv.MKL_NUM_THREADS", "2")
-    val extraJavaOptions = conf.get("spark.executor.extraJavaOptions")
-    conf.set("spark.executor.extraJavaOptions", extraJavaOptions +
-      " -Djava.library.path=$JAVA_LIBRARY_PATH:/data/gaiaadmin/gaiaenv/tdwgaia/lib/native:.:./torch/torch-lib")
 
     val sc = new SparkContext(conf)
 
