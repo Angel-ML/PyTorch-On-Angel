@@ -79,6 +79,23 @@ void add_input(JNIEnv *env,
                std::vector<std::pair<std::string, void *>> *ptrs, jarray value,
                const torch::TensorOptions &option, const std::string &key);
 
+void add_input(JNIEnv* env,
+               std::vector<torch::jit::IValue>* inputs,
+               std::vector<std::pair<std::string, void*>> *ptrs,
+               jobject jparams,
+               jboolean sparse,
+               const std::string& feat_key,
+               const std::string& feat_dim_key,
+               const std::string& embed_dim_key);
+
+void add_input(JNIEnv* env,
+               std::vector<torch::jit::IValue>* inputs,
+               std::vector<std::pair<std::string, void*>> *ptrs,
+               jobject jparams,
+               const std::string& feat_key,
+               int input_size,
+               int batch_size);
+               
 // dssm add input
 void add_input_dssm(JNIEnv *env, std::vector<torch::jit::IValue> *inputs,
                     std::vector<std::pair<std::string, void *>> *ptrs,

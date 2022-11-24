@@ -186,6 +186,30 @@ JNIEXPORT jint JNICALL Java_com_tencent_angel_pytorch_Torch_getItemEmbeddingDim(
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getNodeTypes
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getNodeTypes
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getEdgeTypes
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getEdgeTypes
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
+ * Method:    getSchema
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_tencent_angel_pytorch_Torch_getSchema
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_tencent_angel_pytorch_Torch
  * Method:    getEmbeddingsSize
  * Signature: (J)[I
  */
@@ -258,7 +282,7 @@ JNIEXPORT jfloat JNICALL Java_com_tencent_angel_pytorch_Torch_gcnBackward(
  * Signature: (JLjava/lang/String;Ljava/util/Map;)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL Java_com_tencent_angel_pytorch_Torch_gcnExecMethod(
-    JNIEnv *, jclass, jlong, jstring, jobject);
+    JNIEnv *, jclass, jlong, jstring, jobject, jboolean);
 
 /*
  * Class:     com_tencent_angel_pytorch_Torch

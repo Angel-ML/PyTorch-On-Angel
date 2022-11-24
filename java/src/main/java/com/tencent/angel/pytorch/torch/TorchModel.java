@@ -131,6 +131,12 @@ public class TorchModel implements Serializable {
 
   public int getItemEmbeddingDim() { return Torch.getItemEmbeddingDim(ptr); }
 
+  public String getNodeTypes() { return Torch.getNodeTypes(ptr); }
+
+  public String getEdgeTypes() { return Torch.getEdgeTypes(ptr); }
+
+  public String getSchema() { return Torch.getSchema(ptr); }
+
   public void save(float[] bias, float[] weights, String path) {
     Map<String, Object> params = buildParams(bias, weights);
     params.put("path", path);
@@ -384,15 +390,15 @@ public class TorchModel implements Serializable {
     params.put("first_edge_index", firstEdgeIndex);
     params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
-    return (float[]) Torch.gcnExecMethod(ptr, "forward_", params);
+    return (float[]) Torch.gcnExecMethod(ptr, "forward_", params, false);
   }
 
   public float[] gcnForward(Map<String, Object> params) {
-    return (float[]) Torch.gcnExecMethod(ptr, "forward_", params);
+    return (float[]) Torch.gcnExecMethod(ptr, "forward_", params, false);
   }
 
   public float[] gcnPred(Map<String, Object> params) {
-    return (float[]) Torch.gcnExecMethod(ptr, "embedding_predict_", params);
+    return (float[]) Torch.gcnExecMethod(ptr, "embedding_predict_", params, false);
   }
 
   public long[] gcnPredict(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
@@ -404,11 +410,11 @@ public class TorchModel implements Serializable {
     params.put("first_edge_index", firstEdgeIndex);
     params.put("second_edge_index", secondEdgeIndex);
     params.put("weights", weights);
-    return (long[]) Torch.gcnExecMethod(ptr, "predict_", params);
+    return (long[]) Torch.gcnExecMethod(ptr, "predict_", params, false);
   }
 
   public Object gcnPredict(Map<String, Object> params) {
-    return Torch.gcnExecMethod(ptr, "predict_", params);
+    return Torch.gcnExecMethod(ptr, "predict_", params, false);
   }
 
   public float gcnBackward(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
@@ -428,6 +434,10 @@ public class TorchModel implements Serializable {
     return Torch.gcnBackward(ptr, params, sparse);
   }
 
+  public float gatneBackward(Map<String, Object> params, boolean sparse) {
+    return Torch.gatneBackward(ptr, params, sparse);
+  }
+
   public float[] gcnEmbedding(int batchSize, float[] x, int featureDim, long[] firstEdgeIndex,
                               long[] secondEdgeIndex, float[] weights) {
     Map<String, Object> params = new HashMap<String, Object>();
@@ -439,15 +449,19 @@ public class TorchModel implements Serializable {
     if (secondEdgeIndex != null) {
       params.put("second_edge_index", secondEdgeIndex);
     }
-    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params);
+    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params, false);
   }
 
   public float[] gcnEmbedding(Map<String, Object> params) {
-    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params);
+    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params, false);
+  }
+
+  public float[] gcnEmbedding(Map<String, Object> params, boolean sparse) {
+    return (float[]) Torch.gcnExecMethod(ptr, "embedding_", params, sparse);
   }
 
   public float[] gcnBiEmbedding(Map<String, Object> params, String method) {
-    return (float[]) Torch.gcnExecMethod(ptr, method, params);
+    return (float[]) Torch.gcnExecMethod(ptr, method, params, false);
   }
 
   public float dgiBackward(int batchSize, float[] pos_x, float[] neg_x, int featureDim,

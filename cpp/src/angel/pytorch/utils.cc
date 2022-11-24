@@ -183,6 +183,76 @@ void add_input(JNIEnv *env, std::vector<torch::jit::IValue> *inputs,
   env->ReleasePrimitiveArrayCritical(inputs_size_array, p_insize, 0);
 }
 
+void add_input(JNIEnv* env,
+               std::vector<torch::jit::IValue>* inputs,
+               std::vector<std::pair<std::string, void*>> *ptrs,
+               jobject params,
+               jboolean sparse,
+               const std::string& feat_key,
+               const std::string& feat_dim_key,
+               const std::string& embed_dim_key) {
+  auto feature_array = (jobjectArray) angel::jni_map_get(env, params, feat_key);
+  auto f_dims = (jarray) jni_map_get(env, params, feat_dim_key);
+  auto e_dims = (jarray) jni_map_get(env, params, embed_dim_key);
+  jboolean is_copy;
+  void* p_feat_array = env->GetPrimitiveArrayCritical(feature_array, &is_copy);
+  void* p_fdims = env->GetPrimitiveArrayCritical(f_dims, &is_copy);
+  auto* p_fidims = reinterpret_cast<int*>(p_fdims);
+  void* p_edims = env->GetPrimitiveArrayCritical(e_dims, &is_copy);
+  auto* p_eidims = reinterpret_cast<int*>(p_edims);
+  int feature_size = env->GetArrayLength(f_dims);
+
+  std::vector<at::Tensor> tensors;
+  for(int i = 0; i < feature_size; i++) {
+    jarray feat = (jfloatArray)env->GetObjectArrayElement(feature_array, i);
+    int feature_dim = p_fidims[i];
+    int feat_num = 0;
+    if (feature_dim > 0) {
+      feat_num = env->GetArrayLength(feat) / feature_dim;
+    }
+    void* f_data = env->GetPrimitiveArrayCritical(feat, &is_copy);
+    auto* f_fdata = reinterpret_cast<float*>(f_data);
+    if (sparse) {
+      int embedding_dim = p_eidims[i];
+      int feat_num = env->GetArrayLength(feat) / embedding_dim;
+      auto tensor = torch::from_blob(f_fdata, {feat_num, embedding_dim}, TORCH_OPTION_FLOAT_GRAD);
+      tensors.push_back(tensor);
+    } else {
+      auto tensor = torch::from_blob(f_fdata, {feat_num, feature_dim}, TORCH_OPTION_FLOAT);
+      tensors.push_back(tensor);
+    }
+    env->ReleasePrimitiveArrayCritical(feat, f_data, 0);
+  }
+  inputs->emplace_back(tensors);
+  ptrs->push_back(std::make_pair(feat_key, p_feat_array));
+  env->ReleasePrimitiveArrayCritical(f_dims, p_fdims, 0);
+  env->ReleasePrimitiveArrayCritical(e_dims, p_edims, 0);
+}
+
+void add_input(JNIEnv* env,
+               std::vector<torch::jit::IValue>* inputs,
+               std::vector<std::pair<std::string, void*>> *ptrs,
+               jobject jparams,
+               const std::string& key,
+               int input_size,
+               int batch_size) {
+  auto data_array = (jobjectArray) angel::jni_map_get(env, jparams, key);
+  jboolean is_copy;
+  void* p_ids = env->GetPrimitiveArrayCritical(data_array, &is_copy);
+  std::vector<at::Tensor> tensors;
+  for(int i = 0; i < batch_size; i++) {
+    auto ids = (jintArray)env->GetObjectArrayElement(data_array, i);
+    int ids_num = env->GetArrayLength(ids) / input_size;
+    void* c_ptr = env->GetPrimitiveArrayCritical(ids, &is_copy);
+    auto* id_ptr = reinterpret_cast<int*>(c_ptr);
+    auto tensor = torch::from_blob(id_ptr, {input_size, ids_num}, TORCH_OPTION_INT32);
+    tensors.push_back(tensor);
+    env->ReleasePrimitiveArrayCritical(ids, c_ptr, 0);
+  }
+  inputs->emplace_back(tensors);
+  ptrs->push_back(std::make_pair(key, p_ids));
+}
+
 // self defined add inputs for dssm
 void add_input_dssm(JNIEnv *env, std::vector<torch::jit::IValue> *inputs,
                     std::vector<std::pair<std::string, void *>> *ptrs,

@@ -55,6 +55,12 @@ public class Torch {
 
   public static native int getItemEmbeddingDim(long ptr);
 
+  public static native String getNodeTypes(long ptr);
+
+  public static native String getEdgeTypes(long ptr);
+
+  public static native String getSchema(long ptr);
+
   public static native int[] getEmbeddingsSize(long ptr);
 
   public static native int getParametersTotalSize(long ptr);
@@ -79,8 +85,11 @@ public class Torch {
   /* graph backward */
   public static native float gcnBackward(long ptr, Map<String, Object> params, boolean sparse);
 
+  /* graph backward */
+  public static native float gatneBackward(long ptr, Map<String, Object> params, boolean sparse);
+
   /* graph exec */
-  public static native Object gcnExecMethod(long ptr, String method, Map<String, Object> params);
+  public static native Object gcnExecMethod(long ptr, String method, Map<String, Object> params, boolean sparse);
 
   /* graph get all parameters */
   public static native float[] getParameters(long ptr);
