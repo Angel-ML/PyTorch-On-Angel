@@ -128,5 +128,5 @@ object IOFunctions {
     if (df.rdd.filter(row => row.get(0) != null).count() == 0) throw new AngelException("The edge feature format is incorrect, please check!!!")
     df
   }
-  
+
 }
