@@ -18,7 +18,7 @@ package com.tencent.angel.pytorch.graph.gcn
 
 import com.tencent.angel.ml.math2.VFactory
 import com.tencent.angel.ml.math2.storage.IntFloatDenseVectorStorage
-import com.tencent.angel.ml.math2.vector.{IntFloatVector, LongFloatVector}
+import com.tencent.angel.ml.math2.vector.{IntFloatVector, IntLongVector, LongFloatVector, LongIntVector}
 import com.tencent.angel.pytorch.graph.gcn.hetAttention.HANPartition
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList}
@@ -434,6 +434,15 @@ class NodeLabelPartition(index: Int, labels: LongFloatVector) extends Serializab
     model.setTestLabels(labels)
 }
 
+class NodeTypePartition(index: Int, types: LongIntVector) extends Serializable {
+  def init(model: EmbeddingGNNPSModel): Unit =
+    model.setNodeTypes(types)
+}
+
+class Index2NodePartition(index: Int, nodes: IntLongVector) extends Serializable {
+  def init(model: EmbeddingGNNPSModel): Unit =
+    model.setIndex2Node(nodes)
+}
 
 private[gcn]
 object GraphAdjPartition {
@@ -621,5 +630,29 @@ object NodeFeaturePartition {
       features.append(entry._2)
     }
     new NodeFeaturePartition(index, keys.toLongArray, features.toArray)
+  }
+}
+
+private[gcn]
+object NodeTypePartition {
+  def apply(index: Int, iterator: Iterator[(Long, Int)], dim: Long): NodeTypePartition = {
+    val types = VFactory.sparseLongKeyIntVector(dim)
+    while (iterator.hasNext) {
+      val entry = iterator.next()
+      types.set(entry._1, entry._2)
+    }
+    new NodeTypePartition(index, types)
+  }
+}
+
+private[gcn]
+object Index2NodePartition {
+  def apply(index: Int, iterator: Iterator[(Int, Long)], dim: Long): Index2NodePartition = {
+    val nodes = VFactory.sparseLongVector(dim.toInt)
+    while (iterator.hasNext) {
+      val entry = iterator.next()
+      nodes.set(entry._1, entry._2)
+    }
+    new Index2NodePartition(index, nodes)
   }
 }
