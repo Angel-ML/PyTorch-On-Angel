@@ -48,6 +48,30 @@ object MakeSparseBiFeature {
         }
     }
   }
+  
+  def makeFeatures_(index: Long2IntOpenHashMap, featureDim: Int,
+                    features: Long2ObjectOpenHashMap[Array[Float]]): Array[Float] = {
+    val size = index.size()
+    val x = new Array[Float](size * featureDim)
+    val temp = features.keySet().toLongArray
+    if (features.size() != size) {
+      println(s"context numKeys vs numHasFeatures: ${size} vs ${features.size()}")
+      index.keySet().toLongArray.diff(temp).foreach(println)
+    }
+    assert(features.size() == size)
+    val it = features.long2ObjectEntrySet().fastIterator()
+    while (it.hasNext) {
+      val entry = it.next()
+      val (node, f) = (entry.getLongKey, entry.getValue)
+      val start = index.get(node) * featureDim
+      var j = 0
+      while (j < featureDim) {
+        x(start + j) = f(j)
+        j += 1
+      }
+    }
+    x
+  }
 
   def makeFeatures(index: Long2IntOpenHashMap, featureDim: Int,
                    features: Long2ObjectOpenHashMap[IntFloatVector]): Array[Float] = {
