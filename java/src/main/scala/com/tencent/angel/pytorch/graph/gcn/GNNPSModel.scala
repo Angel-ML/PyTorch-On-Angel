@@ -57,8 +57,7 @@ class GNNPSModel(graph: PSMatrix,
                  weights: PSVector,
                  labels: PSVector,
                  testLabels: PSVector) extends Serializable {
-
-  val dim: Long = labels.dimension
+  val dim: Long = if (labels != null) labels.dimension else -1L
 
   // the default pull method will return keys even those not exists on servers
   def readLabels(keys: Array[Long]): LongFloatVector =
