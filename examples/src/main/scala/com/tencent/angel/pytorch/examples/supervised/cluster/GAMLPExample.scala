@@ -116,10 +116,10 @@ object GAMLPExample {
     val edges = GraphIO.load(edgeInput, isWeighted = false, sep = sep)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
     val labels = if (labelPath.length > 0) {
-      Option(if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath, seq=labelSep))
+      Option(if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath, sep=labelSep))
     } else None
     val testLabels = if (testLabelPath.length > 0)
-      Option(if (numLabels > 1) IOFunctions.loadMultiLabel(testLabelPath, sep = "p") else IOFunctions.loadLabel(testLabelPath, seq=labelSep))
+      Option(if (numLabels > 1) IOFunctions.loadMultiLabel(testLabelPath, sep = "p") else IOFunctions.loadLabel(testLabelPath, sep=labelSep))
     else None
 
     val (model, graph) = gamlp.initialize(edges, features, labels, testLabels)

@@ -43,6 +43,7 @@ object GATNEExample {
     val negSampleByNodeType = params.getOrElse("negSampleByNodeType", "false").toBoolean
     val evaluateByEdgeType = params.getOrElse("evaluateByEdgeType", "false").toBoolean
     val outputEmbeddingByNodeType = params.getOrElse("outputEmbeddingByNodeType", "false").toBoolean
+    val outputEmbeddingByEdgeType = params.getOrElse("outputEmbeddingByEdgeType", "false").toBoolean
     val format = params.getOrElse("format", "dense")
     val batchSize = params.getOrElse("batchSize", "50").toInt
     var psNumPartition = params.getOrElse("psNumPartition", "10").toInt
@@ -112,6 +113,8 @@ object GATNEExample {
     gatne.setFieldMultiHot(fieldMultiHot)
     gatne.setFeatEmbedPath(featureEmbedInputPath)
     gatne.setContextEmbedPath(ContextEmbeddingInputPath)
+    gatne.setOutputEmbeddingByNodeType(outputEmbeddingByNodeType)
+    gatne.setOutputEmbeddingByEdgeType(outputEmbeddingByEdgeType)
 
     val data = GraphIO.loadString(walkInput)
     val edges = IOFunctions.loadEdge(edgeInput, isTyped = true, sep = sep)
@@ -123,60 +126,16 @@ object GATNEExample {
       (kv(0).toInt, IOFunctions.loadFeature(kv(1), sep = featureSep))
     }.toMap
     val nodeTypeRDD = IOFunctions.loadNodeType(nodeTypeInput, sep = sep)
-      .select("node", "type")
-      .rdd
-      .map(r => (r.getLong(0), r.getInt(1)))
-      .distinct()
-      .join(nodes)
-      .map(r => (r._1, r._2._1))
-      .repartition(numPartitions)
-      .persist(StorageLevel.fromString(storageLevel))
 
     val model = gatne.initialize(edges, featuresMap, nodeTypeRDD, mean, std)
     edges.unpersist()
     gatne.showSummary(model)
 
-    val corpus = data.filter(f => f != null && f.nonEmpty)
-      .map(f => f.stripLineEnd.split("[\\s+|,]").map(s => s.toLong))
-      .filter(arr => arr.length > 1)
-      .repartition(numPartitions)
-      .persist(StorageLevel.fromString(storageLevel))
-
     if (actionType == "train")
-      gatne.fit(model, corpus, testEdges, nodeTypeRDD, outputModelPath, evaluateByEdgeType)
+      gatne.fit(model, data, testEdges, outputModelPath, evaluateByEdgeType)
 
     if (embeddingOutputPath.nonEmpty) {
-      val spark = SparkSession.builder.getOrCreate
-      var start = System.currentTimeMillis()
-      val predictPairs = gatne.generatePredictPairs(nodeTypeRDD)
-
-      val schema = StructType(Seq(
-        StructField("node", LongType, nullable = false),
-        StructField("edgeType", IntegerType, nullable = false),
-        StructField("embedding", StringType, nullable = false)
-      ))
-      val all_embedding = gatne.genEmbedding(model, predictPairs).persist(StorageLevel.fromString(storageLevel))
-      val c = all_embedding.count()
-      if (outputEmbeddingByNodeType) {
-        val all_nodeTypes = gatne.getNodeTypes.split(",").map(_.toInt)
-        val embedding = all_embedding.map(r => (r._1, (r._2, r._3)))
-        val nodeWithemb = nodeTypeRDD.join(embedding)
-          .map(r => (r._1, r._2._1, r._2._2._1, r._2._2._2)) // node_id, node_type, edge_type, emb
-
-        all_nodeTypes.foreach(t => {
-          start = System.currentTimeMillis()
-          val sub_embedding = nodeWithemb.filter(f => f._2 == t)
-            .map(f => Row.fromSeq(Seq[Any](f._1, f._3, f._4.mkString(" "))))
-          val sub_embeddingDF = spark.createDataFrame(sub_embedding, schema)
-          GraphIO.save(sub_embeddingDF, embeddingOutputPath + "/" + t.toString, seq = "\t")
-          println(s"gen embedding for type ${t}, cost ${System.currentTimeMillis() - start}ms")
-        })
-      } else {
-        val embedding = all_embedding.map(f => Row.fromSeq(Seq[Any](f._1, f._2, f._3.mkString(" "))))
-        val embeddingDF = spark.createDataFrame(embedding, schema)
-        GraphIO.save(embeddingDF, embeddingOutputPath, seq = "\t")
-        println(s"gen embedding for ${c} nodes of all types, cost ${System.currentTimeMillis() - start}ms")
-      }
+      gatne.saveEmbedding(model, embeddingOutputPath)
     }
 
     if (actionType == "train" && outputModelPath.nonEmpty) {

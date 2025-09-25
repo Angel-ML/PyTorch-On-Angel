@@ -1,6 +1,6 @@
 package com.tencent.angel.pytorch.examples.supervised.cluster
 
-import com.tencent.angel.pytorch.graph.gcn.GCN
+import com.tencent.angel.pytorch.graph.gcn.{Aggregator, GCN}
 import com.tencent.angel.pytorch.io.IOFunctions
 import com.tencent.angel.pytorch.utils.{FileUtils, PartitionUtils}
 import com.tencent.angel.spark.context.PSContext
@@ -66,7 +66,7 @@ object AggregatorExample {
     /* Indeed, gcn is the aggregator here,
     but we obtain the aggregated/smoothed features with the help of
     method "genEmbedding" of class "GCN" */
-    val gcn = new GCN()
+    val gcn = new Aggregator()
     gcn.setTorchModelPath(torchModelPath)
     gcn.setFeatureDim(featureDim)
     gcn.setUseBalancePartition(false)
@@ -89,33 +89,13 @@ object AggregatorExample {
     gcn.setFieldMultiHot(fieldMultiHot)
 
     val edges = GraphIO.load(edgeInput, isWeighted = false, sep = sep)
-    var features = IOFunctions.loadFeature(featureInput, sep = "\t")
+    val features = IOFunctions.loadFeature(featureInput, sep = "\t")
 
     val (model, graph) = gcn.initialize(edges, features, None)
 
     assert(predictOutputPath.nonEmpty)
-    val (minId, maxId, _) = gcn.getMinMaxId(edges)
-
-    var featureList = features
-    val spark = SparkSession.builder.getOrCreate
-
-    for (hop <- 1 to hops) {
-      gcn.initFeatures(model, features, minId, maxId)
-      features = gcn.genEmbedding(model, graph)
-      features = features.toDF("node", "feature").persist(MEMORY_ONLY)
-      
-      val rdd_feature_merged = featureList
-        .join(features.toDF("node", "feature2"), "node")
-        .rdd
-        .map(row => (row.getLong(0),
-          row.getString(1) + " " + row.getString(2).replace(',', ' ')))
-      // Delimiter of features and smoothed features should both be a space instead of a comma
-
-      featureList = spark.createDataFrame(rdd_feature_merged).toDF("node", "feature")
-    }
-
-    GraphIO.save(featureList, predictOutputPath, seq = "\t")
-    // The delimiter should be consistent with the input features
+    val feats = gcn.getConcatFeatures(model, graph, edges, features, hops)
+    GraphIO.save(feats, predictOutputPath)
 
     PSContext.stop()
     sc.stop()

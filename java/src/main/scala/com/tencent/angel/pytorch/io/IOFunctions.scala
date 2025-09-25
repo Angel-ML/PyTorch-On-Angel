@@ -17,6 +17,8 @@
 package com.tencent.angel.pytorch.io
 
 import com.tencent.angel.exception.AngelException
+import com.tencent.angel.graph.utils.Delimiter
+import com.tencent.angel.pytorch.utils.FileUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -55,14 +57,14 @@ object IOFunctions {
   }
 
   def loadLabel(input: String, nodeIndex: Int = 0,
-                labelIndex: Int = 1, seq: String = " "): DataFrame = {
+                labelIndex: Int = 1, sep: String = " "): DataFrame = {
     val ss = SparkSession.builder().getOrCreate()
     val schema = StructType(Seq(
       StructField("node", LongType, nullable = false),
       StructField("label", FloatType, nullable = false)
     ))
     val df = ss.read
-      .option("sep", seq)
+      .option("sep", sep)
       .option("header", "false")
       .schema(schema)
       .csv(input)
@@ -180,5 +182,12 @@ object IOFunctions {
       case "colon" => ":"
       case "bar" => "|"
     }
+  }
+
+  def saveEmbeddingByDelimiter(data: DataFrame, sep: String, path: String): Unit = {
+    FileUtils.deletePath(path, data.sparkSession.sparkContext)
+    val result = data.rdd.map(row => row.getLong(0) + Delimiter.parse(sep) + row.getString(1)
+      .split(Delimiter.COMMA_VAL).mkString(Delimiter.parse(sep)))
+    result.saveAsTextFile(path)
   }
 }

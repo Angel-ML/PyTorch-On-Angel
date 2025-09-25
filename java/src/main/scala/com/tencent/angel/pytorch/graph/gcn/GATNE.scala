@@ -8,10 +8,14 @@ import com.tencent.angel.pytorch.params._
 import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.graph.utils.params._
+import com.tencent.angel.pytorch.utils.Constants
+import com.tencent.angel.graph.utils.GraphIO
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import com.tencent.angel.spark.ml.util.LogUtils
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 import Array._
@@ -21,18 +25,19 @@ import scala.collection.mutable
 class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes with HasEdgeTypes with HasInitMethod
   with HasSchema with HasContextDim with HasValidate with HasMaxIndex with HasEachNumSample with HasLogStep
   with HasModelSaveInterval with HasEmbeddingSaveInterval with HasFeatureSplitIdxs with HasContextEmbedPath
-  with HasNegSampleByNodeType with HasLocalNegativeSample {
+  with HasNegSampleByNodeType with HasLocalNegativeSample with HasOutputEmbeddingWithType {
   val minIndexMap: mutable.Map[Int, Int] = mutable.Map[Int, Int]()
   val maxIndexMap: mutable.Map[Int, Int] = mutable.Map[Int, Int]()
-
+  var nodeTypeRDD: RDD[(Long, Int)] = null
 
   def initialize(edgeDF: DataFrame,
                  featureDFs: Map[Int, Dataset[Row]],
-                 nodeTypeRDD: RDD[(Long, Int)],
+                 nodeTypeDF: DataFrame,
                  mean: Float,
                  std: Float): EmbeddingGNNPSModel = {
     val start = System.currentTimeMillis()
 
+    nodeTypeRDD = processNodeData(edgeDF, nodeTypeDF)
     val (minId, maxId, numNodes) = getMinMaxNodeId(nodeTypeRDD.map(r => r._1))
     println(s"minId=$minId maxId=$maxId numNodes=$numNodes")
     setMaxIndex(nodeTypeRDD.count().toInt)
@@ -206,9 +211,8 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
 
   def initIndex2Node(model: EmbeddingGNNPSModel, nodeTypeRDD: RDD[(Long, Int)], negSampleByNodeType: Boolean): Unit = {
     if (negSampleByNodeType) {
-      val all_nodeTypes = getNodeTypes.split(",").map(_.toInt)
       var cur_node_num = 0
-      all_nodeTypes.foreach(t => {
+      getNodeTypes.foreach(t => {
         val temp = nodeTypeRDD.filter(r => r._2 == t).map(r => r._1)
         val num = temp.count().toInt
         minIndexMap += t -> cur_node_num
@@ -262,8 +266,8 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
       Iterator.single(GATNEPartition.apply(index, it, $(torchModelPath))))
   }
 
-  def generatePredictPairs(nodeTypeRDD: RDD[(Long, Int)]): RDD[GATNEPartition] = {
-    val all_edgeTypes = getEdgeTypes.split(",").map(_.toInt)
+  def generatePredictPairs(): RDD[GATNEPartition] = {
+    val all_edgeTypes = getEdgeTypes
     nodeTypeRDD.flatMap(f => all_edgeTypes.map(e => (f._1, f._1, f._2, e))).mapPartitionsWithIndex((index, it) =>
       Iterator.single(GATNEPartition.apply(index, it, $(torchModelPath))))
   }
@@ -295,11 +299,16 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
   }
 
   def fit(model: EmbeddingGNNPSModel,
-          corpus: RDD[Array[Long]],
+          data: RDD[String],
           testEdges: Option[DataFrame],
-          nodeTypeRDD: RDD[(Long, Int)],
           outputModelPath: String,
           evaluateByEdgeType: Boolean): Unit = {
+    val corpus = data.filter(f => f != null && f.nonEmpty)
+      .map(f => f.stripLineEnd.split("[\\s+|,]").map(s => s.toLong))
+      .filter(arr => arr.length > 1)
+      .repartition($(partitionNum))
+      .persist($(storageLevel))
+
     val trainPairs = generateTrainPairs(model, corpus).persist($(storageLevel))
     trainPairs.foreachPartition(_ => Unit)
 
@@ -308,8 +317,6 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
     val optim = getOptimizer
     println(s"optimizer: $optim")
     println(s"evals: ${getEvaluations.mkString(",")}")
-    val all_nodeTypes = getNodeTypes.split(",").map(_.toInt)
-    val all_edgeTypes = getEdgeTypes.split(",").map(_.toInt)
     var schema: Map[(Int, Int), Int] = Map()
     getSchema.split(",").map(s => s.split("-")).map(f => {
       schema += ((f(0).toInt, f(1).toInt) -> f(2).toInt)
@@ -321,7 +328,7 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
     for (curEpoch <- 1 to getNumEpoch) {
       startTs = System.currentTimeMillis()
       val (lossSum, numSteps, allSteps) = trainPairs.map (_.asInstanceOf[GATNEPartition]
-          .trainEpoch(model, $(batchSize), optim, all_nodeTypes, all_edgeTypes, schema, getFeatureDimsByInt, getEmbedDimsByInt,
+          .trainEpoch(model, $(batchSize), optim, getNodeTypes, getEdgeTypes, schema, getFeatureDimsByInt, getEmbedDimsByInt,
             getFieldNumsByInt, getFeatureSplitIdxsByInt, $(fieldMultiHot), $(contextDim), $(negative), getEachNumSample,
            $(logStep), $(localNegativeSample), $(negSampleByNodeType), $(maxIndex), maxIndexMap, minIndexMap))
       .reduce((f1, f2) => (f1._1 + f2._1, math.max(f1._2, f2._2), f1._3 + f2._3))
@@ -339,8 +346,9 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
         println()
       }
 
+      checkpointIfNeed(model, curEpoch)
       if (outputModelPath.nonEmpty && (curEpoch % $(saveModelInterval) == 0 || curEpoch == $(numEpoch)))
-        save(model, outputModelPath, curEpoch)
+        save(model, outputModelPath + Constants.TORCH_MODEL_SAVE_SUB_DIR, curEpoch)
     }
   }
 
@@ -356,8 +364,7 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
         .persist(getStorageLevel)
 
     if (evaluateByEdgeType) {
-      val all_edgeTypes = getEdgeTypes.split(",").map(_.toInt)
-      all_edgeTypes.foreach {e => {
+      getEdgeTypes.foreach {e => {
         val e_scores = scores.filter(f => f._1 == e)
         if (!e_scores.isEmpty()) {
           val validateMetrics = Evaluation.eval(getEvaluations, e_scores.map(r => (r._2, r._3))).map(x => (x._1, x._2.toString))
@@ -382,9 +389,6 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
 
   def genEmbedding(model: EmbeddingGNNPSModel,
                    testPairs: RDD[GATNEPartition]): RDD[(Long, Int, Array[Float])] = {
-
-    val all_nodeTypes = getNodeTypes.split(",").map(_.toInt)
-    val all_edgeTypes = getEdgeTypes.split(",").map(_.toInt)
     var model_schema: Map[(Int, Int), Int] = Map()
     getSchema.split(",").map(s => s.split("-")).map(f => {
       model_schema += ((f(0).toInt, f(1).toInt) -> f(2).toInt)
@@ -393,9 +397,77 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
     })
 
     testPairs.flatMap(_.asInstanceOf[GATNEPartition]
-        .genEmbeddingEpoch(model, getBatchSize, all_nodeTypes, all_edgeTypes, model_schema, getFeatureDimsByInt, getEmbedDimsByInt,
+        .genEmbeddingEpoch(model, getBatchSize, getNodeTypes, getEdgeTypes, model_schema, getFeatureDimsByInt, getEmbedDimsByInt,
           getFieldNumsByInt, getFeatureSplitIdxsByInt, $(fieldMultiHot), $(contextDim), $(negative), getEachNumSample))
   }
+
+  def saveEmbedding(model: EmbeddingGNNPSModel, embeddingOutputPath: String): Unit = {
+    var start = System.currentTimeMillis()
+    val predictPairs = generatePredictPairs()
+    val all_embedding = genEmbedding(model, predictPairs)
+    val c = all_embedding.count()
+
+
+    if ($(outputEmbeddingByEdgeType)){
+      val schema = StructType(Seq(
+        StructField("node", LongType, nullable = false),
+        StructField("embedding", StringType, nullable = false)
+      ))
+      val all_edgeTypes = getEdgeTypes
+      if ($(outputEmbeddingByNodeType)) {
+        val all_nodeTypes = getNodeTypes
+        val embedding = all_embedding.map(r => (r._1, (r._2, r._3)))
+        val nodeWithemb = nodeTypeRDD.join(embedding)
+          .map(r => (r._1, r._2._1, r._2._2._1, r._2._2._2)) // node_id, node_type, edge_type, emb
+
+        all_nodeTypes.foreach(node_type => {
+          start = System.currentTimeMillis()
+          all_edgeTypes.foreach(edge_type => {
+            val sub_embedding = nodeWithemb.filter(f => f._2 == node_type && f._3 == edge_type)
+              .map(f => Row.fromSeq(Seq[Any](f._1, f._4.mkString(" "))))
+            val sub_embeddingDF = SparkSession.builder().getOrCreate().createDataFrame(sub_embedding, schema)
+            GraphIO.save(sub_embeddingDF, embeddingOutputPath + "/node_" + node_type.toString + "/edge_" + edge_type.toString, seq = "\t")
+            println(s"gen embedding for node type ${node_type} and edge type ${edge_type}, cost ${System.currentTimeMillis() - start}ms")
+          })
+        })
+      } else {
+        all_edgeTypes.foreach(edge_type => {
+          val sub_embedding = all_embedding.filter(f => f._2 == edge_type)
+            .map(f => Row.fromSeq(Seq[Any](f._1, f._3.mkString(" "))))
+          val sub_embeddingDF = SparkSession.builder().getOrCreate().createDataFrame(sub_embedding, schema)
+          GraphIO.save(sub_embeddingDF, embeddingOutputPath + "/edge_" + edge_type.toString, seq = "\t")
+          println(s"gen embedding for edge type ${edge_type}, cost ${System.currentTimeMillis() - start}ms")
+        })
+      }
+    } else {
+      val schema = StructType(Seq(
+        StructField("node", LongType, nullable = false),
+        StructField("edgeType", IntegerType, nullable = false),
+        StructField("embedding", StringType, nullable = false)
+      ))
+      if ($(outputEmbeddingByNodeType)) {
+        val all_nodeTypes = getNodeTypes
+        val embedding = all_embedding.map(r => (r._1, (r._2, r._3)))
+        val nodeWithemb = nodeTypeRDD.join(embedding)
+          .map(r => (r._1, r._2._1, r._2._2._1, r._2._2._2)) // node_id, node_type, edge_type, emb
+
+        all_nodeTypes.foreach(t => {
+          start = System.currentTimeMillis()
+          val sub_embedding = nodeWithemb.filter(f => f._2 == t)
+            .map(f => Row.fromSeq(Seq[Any](f._1, f._3, f._4.mkString(" "))))
+          val sub_embeddingDF = SparkSession.builder().getOrCreate().createDataFrame(sub_embedding, schema)
+          GraphIO.save(sub_embeddingDF, embeddingOutputPath + "/node_" + t.toString, seq = "\t")
+          println(s"gen embedding for node type ${t}, cost ${System.currentTimeMillis() - start}ms")
+        })
+      } else {
+        val embedding = all_embedding.map(f => Row.fromSeq(Seq[Any](f._1, f._2, f._3.mkString(" "))))
+        val embeddingDF = SparkSession.builder().getOrCreate().createDataFrame(embedding, schema)
+        GraphIO.save(embeddingDF, embeddingOutputPath, seq = "\t")
+        println(s"gen embedding for ${c} nodes of all types, cost ${System.currentTimeMillis() - start}ms")
+      }
+    }
+  }
+
 
   def saveFeatEmbeds_(model: EmbeddingGNNPSModel, savePath: String, curEpoch: Int = -1): Unit = {
     if (getFieldNums.nonEmpty) {
@@ -407,5 +479,17 @@ class GATNE extends HGNN with HasWindowSize with HasNegative with HasNodeTypes w
   def saveContext(model: EmbeddingGNNPSModel, savePath: String, curEpoch: Int = -1): Unit = {
     val path = if (curEpoch < 0) savePath + "/context" else savePath + s"/context_$curEpoch"
     model.saveContext(path)
+  }
+
+  def processNodeData(edges: DataFrame, nodeType: DataFrame): RDD[(Long, Int)] = {
+    val nodes = edges.select("src", "dst").rdd.flatMap(r => Iterator((r.getLong(0), 1), (r.getLong(1), 1))).distinct()
+    nodeType.select("node", "type").rdd
+      .filter(row => !row.anyNull)
+      .map(r => (r.getLong(0), r.getInt(1)))
+      .distinct()
+      .join(nodes)
+      .map(r => (r._1, r._2._1))
+      .repartition($(partitionNum))
+      .persist($(storageLevel))
   }
 }
