@@ -78,7 +78,7 @@ class GATConv(torch.jit.ScriptModule):
         out = self.message(edge_index_i, x_i, x_j, num_nodes)
 
         out = scatter_add(out, edge_index_i, dim=0).sum(dim=1)
-        out = self.update(torch.matmul(out, self.weight1))
+        out = self.update(torch.mm(out, self.weight1))
         out = torch.softmax(out, dim=0)
         out = F.normalize(out, p=2.0, dim=-1)
 

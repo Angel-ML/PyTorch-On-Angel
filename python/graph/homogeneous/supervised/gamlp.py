@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import sys
+sys.path.extend(["./", "../../"])
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -35,7 +40,7 @@ class GAMLP(torch.jit.ScriptModule):
         W2r = self.W2(r)
         phi = torch.sigmoid(W1M + W2r)
         W = F.softmax(phi, dim=1).view(phi.shape[0], 1, -1)
-        c_msg = torch.matmul(W, feature_list.view(
+        c_msg = torch.mm(W, feature_list.view(
             feature_list.shape[0], self.hops + 1, self.input_dim))
         c_msg = c_msg.view(c_msg.shape[0], -1)
 
@@ -69,7 +74,7 @@ class GAMLP(torch.jit.ScriptModule):
         W2r = self.W2(r)
         phi = torch.sigmoid(W1M + W2r)
         W = F.softmax(phi, dim=1).view(phi.shape[0], 1, -1)
-        c_msg = torch.matmul(W, feature_list.view(
+        c_msg = torch.mm(W, feature_list.view(
             feature_list.shape[0], self.hops + 1, self.input_dim))
         c_msg = c_msg.view(c_msg.shape[0], -1)
 
@@ -96,6 +101,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dim",
@@ -127,5 +133,5 @@ if __name__ == '__main__':
         type=str,
         default="gamlp.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

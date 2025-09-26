@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 import torch
 from nn.conv import BiSAGEConv
@@ -12,6 +13,7 @@ class UnsupervisedBiSAGE(torch.jit.ScriptModule):
     def __init__(self, in_u_dim, in_i_dim, hidden, out_dim):
         super(UnsupervisedBiSAGE, self).__init__()
         # bipartite graph, two types of nodes, namely u,i. Edges: (u, i)
+        hidden = out_dim
 
         self.u_layer1 = BiSAGEConv(in_u_dim, in_i_dim, hidden)
         self.i_layer1 = BiSAGEConv(in_i_dim, in_u_dim, hidden)
@@ -109,6 +111,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_user_dim",
@@ -135,5 +138,5 @@ if __name__ == '__main__':
         type=str,
         default="unsupervised_bipartite_graphsage.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

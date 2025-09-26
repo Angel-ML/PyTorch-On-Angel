@@ -14,8 +14,10 @@
 #
 # !/usr/bin/env python
 
+from __future__ import print_function
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
-
 import torch
 import torch.nn.functional as F
 from torch.nn import Parameter
@@ -24,13 +26,13 @@ from nn.conv import RGCNConv
 
 class RelationGCN(torch.jit.ScriptModule):
 
-    def __init__(self, input_dim, hidden_dim, n_relations, n_bases, n_class,
-        task_type, class_weights=""):
+    def __init__(self, input_dim, hidden_dim, n_relations, n_bases, output_dim,
+                 task_type="classification", class_weights=""):
         super(RelationGCN, self).__init__()
         # loss func for multi label classification
         self.loss_fn = torch.nn.BCELoss()
         self.task_type = task_type
-        self.class_weights = class_weights
+        self.input_dim = input_dim
 
         if len(class_weights) > 2:
             self.class_weights = \
@@ -40,8 +42,8 @@ class RelationGCN(torch.jit.ScriptModule):
 
         self.conv1 = RGCNConv(input_dim, hidden_dim, n_relations, n_bases)
         self.conv2 = RGCNConv(hidden_dim, hidden_dim, n_relations, n_bases)
-        self.weight = Parameter(torch.zeros(hidden_dim, n_class))
-        self.bias = Parameter(torch.zeros(n_class))
+        self.weight = Parameter(torch.zeros(hidden_dim, output_dim))
+        self.bias = Parameter(torch.zeros(output_dim))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -50,15 +52,18 @@ class RelationGCN(torch.jit.ScriptModule):
             torch.nn.init.xavier_uniform_(self.bias)
 
     @torch.jit.script_method
-    def forward_(self, x, first_edge_index, second_edge_index, first_edge_type, second_edge_type):
+    def forward_(self, x, first_edge_index, second_edge_index, first_edge_type,
+                 second_edge_type):
         # type: (Optional[Tensor], Tensor, Tensor, Tensor, Tensor) -> Tensor
-        x = self.embedding_(x, first_edge_index, second_edge_index, first_edge_type, second_edge_type)
-        x = torch.matmul(x, self.weight)
-        x = x + self.bias
+        x = self.embedding_(x, first_edge_index, second_edge_index,
+                            first_edge_type,
+                            second_edge_type)
+        x = torch.mm(x, self.weight)
+        out = x + self.bias
         if self.task_type == "classification":
-            return F.log_softmax(x, dim=1)
+            return F.log_softmax(out, dim=1)
         else:
-            return F.sigmoid(x)
+            return F.sigmoid(out)
 
     @torch.jit.script_method
     def loss(self, y_pred, y_true):
@@ -73,16 +78,19 @@ class RelationGCN(torch.jit.ScriptModule):
             return self.loss_fn(y_pred, u_true)
 
     @torch.jit.script_method
-    def predict_(self, x, first_edge_index, second_edge_index, first_edge_type, second_edge_type):
+    def predict_(self, x, first_edge_index, second_edge_index, first_edge_type,
+                 second_edge_type):
         # type: (Optional[Tensor], Tensor, Tensor, Tensor, Tensor) -> Tensor
-        output = self.forward_(x, first_edge_index, second_edge_index, first_edge_type, second_edge_type)
+        output = self.forward_(x, first_edge_index, second_edge_index,
+                               first_edge_type, second_edge_type)
         if self.task_type == "classification":
             return output.max(1)[1]
         else:
             return output
 
     @torch.jit.script_method
-    def embedding_(self, x, first_edge_index, second_edge_index, first_edge_type, second_edge_type):
+    def embedding_(self, x, first_edge_index, second_edge_index,
+                   first_edge_type, second_edge_type):
         # type: (Optional[Tensor], Tensor, Tensor, Tensor, Tensor) -> Tensor
         x = F.relu(self.conv1(x, second_edge_index, second_edge_type, None))
         x = self.conv2(x, first_edge_index, first_edge_type, None)
@@ -94,12 +102,12 @@ FLAGS = None
 
 def main():
     rgcn = RelationGCN(FLAGS.input_dim, FLAGS.hidden_dim, FLAGS.n_relations,
-                       FLAGS.n_bases, FLAGS.n_class, FLAGS.task_type,
-                       FLAGS.class_weights)
+                       FLAGS.n_bases, FLAGS.output_dim, FLAGS.task_type, FLAGS.class_weights)
     rgcn.save(FLAGS.output_file)
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dim",
@@ -112,7 +120,7 @@ if __name__ == '__main__':
         default=32,
         help="hidden dimension of rgcn convolution layer")
     parser.add_argument(
-        "--n_class",
+        "--output_dim",
         type=int,
         default=2,
         help="the number of classes")
@@ -127,19 +135,19 @@ if __name__ == '__main__':
         default=1,
         help="the number types of relations for edges")
     parser.add_argument(
-        "--n_bases",
-        type=int,
-        default=30,
-        help="the number of bases in rgcn model")
-    parser.add_argument(
         "--task_type",
         type=str,
         default="classification",
-        help="classification or multi-label-classification")
+        help="classification or multi_label_classification")
     parser.add_argument(
         "--class_weights",
         type=str,
         default="",
         help="class weights, in order to balance class, such as: 0.1,0.9")
-    FLAGS, unparsed = parser.parse_known_args()
+    parser.add_argument(
+        "--n_bases",
+        type=int,
+        default=30,
+        help="the number of bases in rgcn model")
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

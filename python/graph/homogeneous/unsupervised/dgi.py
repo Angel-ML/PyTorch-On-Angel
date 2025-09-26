@@ -15,6 +15,8 @@
 # !/usr/bin/env python
 
 from __future__ import print_function
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 import torch
 import torch.nn.functional as F
@@ -87,6 +89,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dim",
@@ -108,5 +111,5 @@ if __name__ == '__main__':
         type=str,
         default="dgi.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

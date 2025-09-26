@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 import torch
 import torch.nn.functional as F
@@ -43,7 +44,7 @@ class GATTwoOrder(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward_(self, x, first_edge_index, second_edge_index=torch.Tensor([])):
         x = self.embedding_(x, first_edge_index, second_edge_index)
-        out = torch.matmul(x, self.weight)
+        out = torch.mm(x, self.weight)
         out = out + self.bias
         if self.task_type == "classification":
             return F.log_softmax(out, dim=1)
@@ -72,7 +73,7 @@ class GATTwoOrder(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def embedding_predict_(self, embedding):
-        out = torch.matmul(embedding, self.weight)
+        out = torch.mm(embedding, self.weight)
         out = out + self.bias
         if self.task_type == "classification":
             return F.log_softmax(out, dim=1)
@@ -101,6 +102,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dim",
@@ -142,5 +144,5 @@ if __name__ == '__main__':
         type=str,
         default="gat.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

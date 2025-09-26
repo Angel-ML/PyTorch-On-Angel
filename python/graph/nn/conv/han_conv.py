@@ -72,15 +72,15 @@ class HANConv(torch.jit.ScriptModule):
         # out = F.normalize(out, p=2.0, dim=-1)
 
         # nonlinear transformation
-        second_input = torch.tanh(torch.matmul(out, self.weight) + self.bias)
+        second_input = torch.tanh(torch.mm(out, self.weight) + self.bias)
 
         return out, second_input, new_index
 
     @torch.jit.script_method
     def semantic_level(self, out, input, edge_index, edge_types):
         temp = torch._unique(edge_index)[0]
-        new_row_index = torch.div(temp, self.item_types)
-        new_type_index = torch.remainder(temp, self.item_types)
+        new_row_index = torch.div(temp, self.item_types).to(torch.long)
+        new_type_index = torch.remainder(temp, self.item_types).to(torch.long)
         count = scatter_add(torch.ones_like(edge_index), edge_types) + 1e-16
         a = scatter_add(input, new_type_index, 0)
         wq = torch.mul(torch.div(a, count.reshape(a.size()[0], 1)), self.q).sum(1).exp()

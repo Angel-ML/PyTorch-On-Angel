@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
+import sys
+sys.path.extend(["./", "../../"])
 
 import argparse
 import torch
@@ -32,11 +34,12 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output_file",
         type=str,
         default="aggregator.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

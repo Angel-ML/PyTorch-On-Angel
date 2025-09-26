@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 
 import torch
@@ -51,7 +52,7 @@ class SupervisedIGMC(torch.jit.ScriptModule):
     def forward_(self, labeled_edge_index, edge_index, pos_u, pos_i, edge_type):
         out = self.embedding_(labeled_edge_index, edge_index, pos_u, pos_i, edge_type)
 
-        out = torch.matmul(out, self.weight)
+        out = torch.mm(out, self.weight)
         out = out + self.bias
         if self.method == "classification":
             out = F.log_softmax(out, dim=-1)
@@ -71,7 +72,7 @@ class SupervisedIGMC(torch.jit.ScriptModule):
 
             if self.arr_lambda > 0:
                 for gconv in self.convs:
-                    w = torch.matmul(
+                    w = torch.mm(
                         gconv.att,
                         gconv.basis.view(gconv.n_bases, -1)
                     ).view(gconv.edge_types, gconv.out_h, gconv.out_h)
@@ -95,8 +96,8 @@ class SupervisedIGMC(torch.jit.ScriptModule):
 
         concat_states_u = []
         concat_states_i = []
-        u = torch.matmul(pos_u, self.weightU)
-        i = torch.matmul(pos_i, self.weightI)
+        u = torch.mm(pos_u, self.weightU)
+        i = torch.mm(pos_i, self.weightI)
         for conv in self.convs:
             u_embedding, i_embedding = conv(u, i, edge_index, edge_type)
             concat_states_u.append(u_embedding)
@@ -112,7 +113,7 @@ class SupervisedIGMC(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def embedding_predict_(self, embedding):
-        out = torch.matmul(embedding, self.weight)
+        out = torch.mm(embedding, self.weight)
         out = out + self.bias
         if self.method == "classification":
             out = F.log_softmax(out, dim=-1)
@@ -133,6 +134,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_user_dim",
@@ -189,5 +191,5 @@ if __name__ == '__main__':
         type=str,
         default="supervised_igmc_classification.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

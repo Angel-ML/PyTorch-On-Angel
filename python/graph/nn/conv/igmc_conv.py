@@ -50,7 +50,7 @@ class IGMCConv(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def forward(self, u, i, edge_index, edge_type):
-        w = torch.matmul(self.att, self.basis.view(self.n_bases, -1))
+        w = torch.mm(self.att, self.basis.view(self.n_bases, -1))
         w = w.view(self.edge_types, self.out_h, self.out_h)
         row, col = edge_index[0], edge_index[1]
 

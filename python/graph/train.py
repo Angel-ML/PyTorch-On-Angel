@@ -78,11 +78,11 @@ def train_rgcn():
     dataset = Entities(path, name)
     data = dataset[0]
 
-    from rgcn import RGCN
+    from python.graph.homogeneous.supervised.rgcn import RelationGCN
     x = torch.zeros(data.num_nodes, 16)
     torch.nn.init.xavier_uniform_(x)
 
-    model = RGCN(x.size(1), 16, dataset.num_relations, 30, dataset.num_classes)
+    model = RelationGCN(x.size(1), 16, dataset.num_relations, 30, dataset.num_classes)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0005)
 
     train_idx, test_idx, train_y, test_y = mix_train_test(name, 0.2)

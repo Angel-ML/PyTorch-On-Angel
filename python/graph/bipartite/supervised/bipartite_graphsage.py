@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 
 import torch
@@ -57,7 +58,7 @@ class SupervisedBiSAGE(torch.jit.ScriptModule):
                                           second_u_edge_index, first_i_edge_index,
                                           u_batch_ids, i_batch_ids,
                                           u_field_ids, i_field_ids)
-        out = torch.matmul(pos_u_embedding, self.weight)
+        out = torch.mm(pos_u_embedding, self.weight)
         out = out + self.bias
         if self.task_type == "classification":
             return F.log_softmax(out, dim=1)
@@ -107,7 +108,7 @@ class SupervisedBiSAGE(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def embedding_predict_(self, embedding):
-        out = torch.matmul(embedding, self.weight)
+        out = torch.mm(embedding, self.weight)
         out = out + self.bias
         if self.task_type == "classification":
             return F.log_softmax(out, dim=1)
@@ -127,6 +128,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_type", type=str, default="classification",
                         help="classification or multi-label-classification.")
@@ -180,5 +182,5 @@ if __name__ == '__main__':
         type=str,
         default="semi_bipartite_graphsage.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()

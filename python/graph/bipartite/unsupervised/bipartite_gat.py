@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+import sys
+sys.path.extend(["./", "../../"])
 import argparse
 import torch
 import torch.nn.functional as F
@@ -102,8 +103,8 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
             u = parse_feat(u, u_batch_ids, u_field_ids, self.user_field_num, self.encode)
             i = parse_feat(i, i_batch_ids, i_field_ids, self.item_field_num, self.encode)
 
-        u = torch.matmul(u, self.weight_u1)
-        i = torch.matmul(i, self.weight_i1)
+        u = torch.mm(u, self.weight_u1)
+        i = torch.mm(i, self.weight_i1)
 
         return u, i
 
@@ -152,9 +153,9 @@ class UnsupervisedHGAT(torch.jit.ScriptModule):
 
         # conv for u, i
         if conv == "u":
-            user_emb = torch.matmul(user_emb, self.weight_u2)
+            user_emb = torch.mm(user_emb, self.weight_u2)
         else:
-            user_emb = torch.matmul(user_emb, self.weight_i2)
+            user_emb = torch.mm(user_emb, self.weight_i2)
 
         user_emb = F.normalize(user_emb, p=2.0)
 
@@ -225,6 +226,7 @@ def main():
 
 
 if __name__ == '__main__':
+    real_argv = " ".join(sys.argv[1:]).replace("=", " ").split(" ")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_user_dim",
@@ -291,5 +293,5 @@ if __name__ == '__main__':
         type=str,
         default="unsupervised_bipartite_graphsage.pt",
         help="output file name")
-    FLAGS, unparsed = parser.parse_known_args()
+    FLAGS, unparsed = parser.parse_known_args(real_argv)
     main()
