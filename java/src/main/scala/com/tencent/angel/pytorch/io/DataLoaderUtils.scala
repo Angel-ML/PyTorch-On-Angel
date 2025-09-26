@@ -35,6 +35,20 @@ object DataLoaderUtils {
     Iterator.single((minId, maxId, numEdges))
   }
 
+  def summarizeNodesApplyOp(iterator: Iterator[Long]): Iterator[(Long, Long, Long)] = {
+    var minId = Long.MaxValue
+    var maxId = Long.MinValue
+    var numNodes = 0
+    while (iterator.hasNext) {
+      val src = iterator.next()
+      minId = math.min(minId, src)
+      maxId = math.max(maxId, src)
+      numNodes += 1
+    }
+
+    Iterator.single((minId, maxId, numNodes))
+  }
+
   def summarizeReduceOp(t1: (Long, Long, Long),
                         t2: (Long, Long, Long)): (Long, Long, Long) =
     (math.min(t1._1, t2._1), math.max(t1._2, t2._2), t1._3 + t2._3)

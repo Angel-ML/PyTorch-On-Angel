@@ -120,13 +120,13 @@ class GAMLP extends GNN with HasTestRatio with HasValidate with HasUseSharedSamp
       .predictEpoch(0, $(batchSize) * $(batchSizeMultiple), model,
         $(featureDim), $(numSamples), isTest, $(fieldNum), $(fieldMultiHot))).flatMap(f => f._1.zip(f._2))
       .persist(StorageLevel.MEMORY_ONLY)
-    if (${numLabels} > 1) EvaluationM.eval(getEvaluations, scores, ${numLabels})
+    if ($(numLabels) > 1) EvaluationM.eval(getEvaluations, scores, $(numLabels))
     else Evaluation.eval(getEvaluations, scores).map(x => (x._1, x._2.toString))
   }
 
   def evaluate(scores: RDD[(Float, Float)]): Map[String, String] = {
     import com.tencent.angel.pytorch.eval.Evaluation._
-    if (${numLabels} > 1) EvaluationM.eval(getEvaluations, scores, ${numLabels})
+    if ($(numLabels) > 1) EvaluationM.eval(getEvaluations, scores, $(numLabels))
     else Evaluation.eval(getEvaluations, scores).map(x => (x._1, x._2.toString))
   }
 
