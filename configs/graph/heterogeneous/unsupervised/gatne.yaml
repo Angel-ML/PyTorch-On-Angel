@@ -1,0 +1,70 @@
+### 输入图的数据描述信息，包括节点特征、label以及输入边等
+graph:
+  name: "amazon"
+  nodes:
+    - name: "0"
+      feature:
+        format: "dense"
+        sep: "tab"
+        path: "hdfs://xx/amazon_node_type/feature_0.txt"
+    - name: "1"
+      feature:
+        format: "dense"
+        sep: "tab"
+        path: "hdfs://xx/amazon_node_type/feature_1.txt"
+    - name: "2"
+      feature:
+        format: "dense"
+        sep: "tab"
+        path: "hdfs://xx/amazon_node_type/feature_2.txt"
+  edges:
+    base_config:
+      sep: "tab"
+    link_config:
+      - name: "all_edges"
+        path: "hdfs://xx/amazon_node_type/train.txt"
+
+### GNN模型结构参数, model_name请勿修改, 完整参数请参考文档
+model:
+  model_name: "gatne"
+  in_dims: "0:1156,1:1156,2:1156"
+  embedding_dim: 200
+  embedding_u_dim: 10
+  dim_a: 20
+  node_types: "0,1,2"
+  edge_types: "0,1,2,3,4,5,6,7,8"
+  schema: "0-0-0,0-1-1,0-2-2,1-3-0,1-4-1,1-5-2,2-6-0,2-7-1,2-8-2"
+  aggregation_type: "sum"
+  encode: "dense"
+  dropout: 0.3
+
+### 模型训练所需参数，如batch_size, learning_rate, epoch等
+trainer:
+  epoch: 10
+  batch_size: 5000
+  learning_rate: 0.0015
+  decay: 0.5
+  nodes_sample_num: "0:9,1:8,2:7,3:6,4:5,5:6,6:8,7:8,8:9"
+  window_size: 5
+  negative_sample_num: 5
+  optimizer: "adam"
+  eval_metrics: "auc"
+  validate_periods: 1
+  model_save_interval: 10
+  init_method: randomNormal
+  mean: 0
+  std: 1
+  save_checkpoint: "true"
+  evaluate_by_edge_type: "true"
+  output_embedding_by_node_type: "true"
+  output_embedding_by_edge_type: "false"
+  test_edge_path: "hdfs://xx/amazon_node_type/test.txt"
+  walk_path: "hdfs://xx/recode_amazon/walks.txt"
+  node_type_path: "hdfs://xx/amazon_node_type/nodeType.txt"
+  model_save_path: "hdfs://xx/gatne_model"
+  context_embedding_load_path: ""
+  feat_embedding_load_path: ""
+
+### 模型预测所需参数，如节点embedding生成路径，预测结果存储路径等
+predictor:
+  node_embedding_output_path: "hdfs://xx/gatne_embedding"

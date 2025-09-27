@@ -1,0 +1,45 @@
+### 输入图的数据描述信息，包括节点特征、label以及输入边等
+graph:
+  name: "cora"
+  nodes:
+    - name: "paper"
+      feature:
+        format: "sparse"
+        path: "hdfs://xx/cora/cora_feature"
+  edges:
+    base_config:
+      weighted: false
+      sep: "space"
+    link_config:
+      - name: "p2p"
+        src: "paper"
+        dst: "paper"
+        path: "hdfs://xx/cora/cora_edge"
+
+### GNN模型结构参数, model_name请勿修改, 完整参数请参考文档
+model:
+  model_name: "graphsage"
+  input_dim: 1433
+  hidden_dim: 128
+  output_dim: 128
+  neg_sampling: true
+  second: true # only support second-order
+
+### 模型训练所需参数，如batch_size, learning_rate, epoch等
+trainer:
+  epoch: 10
+  batch_size: 128
+  learning_rate: 0.01
+  decay: 0.01
+  train_sample_ratio: 0.8
+  optimizer: "adam"
+  sample_num: 10
+  batch_init_num: 5
+  sample_method: "random"
+  periods: 10
+  model_save_path: "hdfs://xx/un_graphsage_model"
+
+### 模型预测所需参数，如节点embedding生成路径，预测结果存储路径等
+predictor:
+  batch_size_multiplier: 5
+  node_embedding_output_path: "hdfs://xx/un_graphsage_embedding"

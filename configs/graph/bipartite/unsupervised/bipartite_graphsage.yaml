@@ -1,0 +1,55 @@
+### 输入图的数据描述信息，包括节点特征、label以及输入边等
+graph:
+  name: "dblp"
+  nodes:
+    - name: "u"
+      feature:
+        format: "dense"
+        path: "hdfs://xx/dblp/vectors_u"
+    - name: "v"
+      feature:
+        format: "dense"
+        path: "hdfs://xx/dblp/vectors_v"
+  edges:
+    base_config:
+      weighted: false
+      sep: "space"
+    link_config:
+      - name: "u2v"
+        src: "u"
+        dst: "v"
+        path: "hdfs://xx/dblp/ratings_dblp"
+
+### GNN模型结构参数, model_name请勿修改, 完整参数请参考文档
+model:
+  model_name: "bipartite_graphsage"
+  input_user_dim: 128
+  input_item_dim: 128
+  negative_size: 32
+  hidden_dim: 32
+  output_dim: 64
+  encode: "dense"
+  neg_sampling: false
+  second: true
+
+### 模型训练所需参数，如batch_size, learning_rate, epoch等
+trainer:
+  epoch: 10
+  batch_size: 128
+  learning_rate: 0.001
+  decay: 0.01
+  user_sample_num: 10
+  item_sample_num: 10
+  train_sample_ratio: 1.0
+  optimizer: "adam"
+  multi_hot_field: false
+  batch_init_num: 5
+  sample_method: "random"
+  validate_periods: 1
+  periods: 10
+  model_save_path: "hdfs://xx/unsupervised_bigraphsage_model"
+
+### 模型预测所需参数，如节点embedding生成路径，预测结果存储路径等
+predictor:
+  node_embedding_output_path: "hdfs://xx/unsupervised_bigraphsage_embedding"
+

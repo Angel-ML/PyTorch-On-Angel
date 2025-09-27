@@ -1,0 +1,53 @@
+### 输入图的数据描述信息，包括节点特征、label以及输入边等
+graph:
+  name: "reddit"
+  nodes:
+    - name: "user"
+      feature:
+        format: "dense"
+        path: "hdfs://xx/reddit/reddit_features_seq"
+      label:
+        path: "hdfs://xx/reddit/reddit_label"
+        validate_path: ""
+  edges:
+    base_config:
+      weighted: false
+      sep: "space"
+    link_config:
+      - name: "u2u"
+        src: "user"
+        dst: "user"
+        path: "hdfs://xx/reddit/reddit_edge"
+
+### GNN模型结构参数, model_name请勿修改, 完整参数请参考文档
+model:
+  model_name: "gat"
+  input_dim: 602
+  hidden_dim: 128
+  output_dim: 42
+  second: true
+  encode: "dense"
+
+### 模型训练所需参数，如batch_size, learning_rate, epoch等
+trainer:
+  epoch: 10
+  batch_size: 128
+  learning_rate: 0.01
+  decay: 0.01
+  test_ratio: 0.5
+  optimizer: "adam"
+  sample_num: 5
+  batch_init_num: 5
+  eval_metrics: "acc"
+  sample_method: "random"
+  validate_periods: 1
+  periods: 10
+  save_checkpoint: false
+  use_shared_samples: false
+  model_save_path: "hdfs://xx/gat_model"
+
+### 模型预测所需参数，如节点embedding生成路径，预测结果存储路径等
+predictor:
+  batch_size_multiplier: 5
+  node_embedding_output_path: "hdfs://xx/gat_embedding"
+  predict_output_path: "hdfs://xx/gat_predict"
