@@ -6,8 +6,8 @@ sys.path.extend(["./", "../../"])
 import torch
 from torch import nn
 import torch.nn.functional as F
-
 import argparse
+import sys
 
 
 class GAMLP(torch.jit.ScriptModule):
@@ -27,11 +27,10 @@ class GAMLP(torch.jit.ScriptModule):
         self.input_dim = input_dim
 
     @torch.jit.script_method
-    # feature_list is a 2-d tensor of shape (*, (hops + 1) * input_dim)
-    def forward_(self, x, first_edge_index):
-        # type: (Tensor, Tensor) -> Tensor
-        node_list = torch._unique(first_edge_index[0], sorted=True)[0]
-        feature_list = x[node_list]
+    def forward_(self, x):
+        # type: (Tensor) -> Tensor
+        # x is a 2-d tensor of shape (*, (hops + 1) * input_dim)
+        feature_list = x
 
         r = F.relu(self.W0(feature_list))
         W1M = self.W1(feature_list.view(
@@ -40,7 +39,7 @@ class GAMLP(torch.jit.ScriptModule):
         W2r = self.W2(r)
         phi = torch.sigmoid(W1M + W2r)
         W = F.softmax(phi, dim=1).view(phi.shape[0], 1, -1)
-        c_msg = torch.mm(W, feature_list.view(
+        c_msg = torch.matmul(W, feature_list.view(
             feature_list.shape[0], self.hops + 1, self.input_dim))
         c_msg = c_msg.view(c_msg.shape[0], -1)
 
@@ -56,16 +55,15 @@ class GAMLP(torch.jit.ScriptModule):
         return F.cross_entropy(outputs, targets)
 
     @torch.jit.script_method
-    def predict_(self, x, first_edge_index):
-        # type: (Tensor, Tensor) -> Tensor
-        output = self.forward_(x, first_edge_index)
+    def predict_(self, x):
+        # type: (Tensor) -> Tensor
+        output = self.forward_(x)
         return output.max(1)[1]
 
     @torch.jit.script_method
-    def embedding_(self, x, first_edge_index):
-        # type: (Tensor, Tensor) -> Tensor
-        node_list = torch._unique(first_edge_index[0], sorted=True)[0]
-        feature_list = x[node_list]
+    def embedding_(self, x):
+        # type: (Tensor) -> Tensor
+        feature_list = x
 
         r = F.relu(self.W0(feature_list))
         W1M = self.W1(feature_list.view(
@@ -74,7 +72,7 @@ class GAMLP(torch.jit.ScriptModule):
         W2r = self.W2(r)
         phi = torch.sigmoid(W1M + W2r)
         W = F.softmax(phi, dim=1).view(phi.shape[0], 1, -1)
-        c_msg = torch.mm(W, feature_list.view(
+        c_msg = torch.matmul(W, feature_list.view(
             feature_list.shape[0], self.hops + 1, self.input_dim))
         c_msg = c_msg.view(c_msg.shape[0], -1)
 
@@ -107,12 +105,12 @@ if __name__ == '__main__':
         "--input_dim",
         type=int,
         default=-1,
-        help="input dimention of node features")
+        help="input dimension of node features")
     parser.add_argument(
         "--hidden_dim",
         type=int,
         default=-1,
-        help="hidden dimension of graphsage convolution layer")
+        help="hidden dimension, the dimension of hidden layers")
     parser.add_argument(
         "--output_dim",
         type=int,

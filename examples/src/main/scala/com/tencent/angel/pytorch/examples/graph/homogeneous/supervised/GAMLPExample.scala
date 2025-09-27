@@ -23,9 +23,7 @@ object GAMLPExample {
     val (torchModelPath, config) = getGNNTorchModelPathAndConfig(Constants.GRAPH_TYPE_HOMOGENEOUS, Constants.TASK_TYPE_SUPERVISED)
 
     // path params
-    val edgeInput = FileUtils.parseDatePartitionName(config.graph.getEdges.link_config.get(0).get(Constants.PATH).toString)
     val featureInput = FileUtils.parseDatePartitionName(config.graph.getNodes.get(0).getFeature.get(Constants.PATH).toString)
-    val shuffleSamples = config.trainer.get(Constants.SHUFFLE_SAMPLES).toString.toBoolean
     val labelPath = FileUtils.parseDatePartitionName(config.graph.getNodes.get(0).getLabel.get(Constants.PATH).toString)
     val testLabelPath = FileUtils.parseDatePartitionName(config.graph.getNodes.get(0).getLabel.get(Constants.VALIDATE_PATH).toString)
     val predictOutputPath = FileUtils.parseDatePartitionName(config.predictor.get(Constants.PREDICT_OUTPUT_PATH).toString)
@@ -53,11 +51,9 @@ object GAMLPExample {
     val numLabels = config.trainer.get(Constants.LABELS_NUM).toString.toInt // a multi-label classification task if numLabels > 1
     var evals = config.trainer.get(Constants.EVAL_METRICS).toString
     val batchSizeMultiple = config.predictor.get(Constants.BATCH_SIZE_MULTIPLIER).toString.toInt
-    val sep = Delimiter.parse(config.graph.getEdges.base_config.get(Constants.DELIMITER).toString)
     val featureSep = Delimiter.parse(config.graph.nodes.get(0).feature.get(Constants.DELIMITER).toString)
     val labelSep = Delimiter.parse(config.graph.getNodes.get(0).getLabel.get(Constants.DELIMITER).toString)
     val hops = config.model.get(Constants.HOPS).toString.toInt
-
     if (numLabels > 1) evals = "multi_auc"
 
     val conf = EntryUtils.start(mode, torchModelPath, "GAMLP", actionType)
@@ -95,17 +91,15 @@ object GAMLPExample {
     gamlp.setFieldNum(fieldNum)
     gamlp.setFieldMultiHot(fieldMultiHot)
 
-    val edges = GraphIO.load(edgeInput, isWeighted = false, sep = sep)
     val features = IOFunctions.loadFeature(featureInput, sep = featureSep)
-    val labels = if (labelPath.length > 0) {
+    val labels = if (labelPath.nonEmpty) {
       Option(if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath, sep=labelSep))
     } else None
-    val testLabels = if (testLabelPath.length > 0)
+    val testLabels = if (testLabelPath.nonEmpty)
       Option(if (numLabels > 1) IOFunctions.loadMultiLabel(testLabelPath, sep = "p") else IOFunctions.loadLabel(testLabelPath, sep=labelSep))
     else None
 
-    val (model, graph) = gamlp.initialize(edges, features, labels, testLabels)
-    gamlp.showSummary(model, graph)
+    val (model, graph) = gamlp.initialize(features, labels, testLabels)
 
     if (Constants.TRAIN.equals(actionType))
       gamlp.fit(model, graph, outputModelPath)

@@ -19,6 +19,7 @@ package com.tencent.angel.pytorch.graph.gcn
 import com.tencent.angel.ml.math2.VFactory
 import com.tencent.angel.ml.math2.storage.IntFloatDenseVectorStorage
 import com.tencent.angel.ml.math2.vector.{IntFloatVector, IntLongVector, LongFloatVector, LongIntVector}
+import com.tencent.angel.pytorch.data.SampleParser
 import com.tencent.angel.pytorch.graph.gcn.hetAttention.HANPartition
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongArrayList}
@@ -148,6 +149,24 @@ class GraphAdjPartition(index: Int,
 
   def toMiniBatchDGIPartition(model: GNNPSModel, torchModelPath: String, useSecondOrder: Boolean, dataFormat: String): DGIPartition = {
     new DGIPartition(index, keys, indptr, neighbours, null, torchModelPath, useSecondOrder, dataFormat)
+  }
+
+  def makeTrainTest(model: GNNPSModel, isTraining: Boolean, testRatio: Float, numLabels: Int) : (Array[Int], Array[Int], Array[Array[Float]], Array[Array[Float]]) = {
+    if (isTraining) {
+      if (numLabels > 1) {
+        splitTrainTestM(model, testRatio)
+      } else {
+        if (model.nnzTestLabels() == 0) {
+          val temp = splitTrainTest(model, testRatio)
+          (temp._1, temp._2, temp._3.map(Array(_)), temp._4.map(Array(_)))
+        } else {
+          val temp = getTrainTest(model)
+          (temp._1, temp._2, temp._3.map(Array(_)), temp._4.map(Array(_)))
+        }
+      }
+    } else {
+      (null, null, null, null)
+    }
   }
 
   def toSemiGATPartition(model: GNNPSModel, torchModelPath: String, useSecondOrder: Boolean,
@@ -463,6 +482,19 @@ class Index2NodePartition(index: Int, nodes: IntLongVector) extends Serializable
 }
 
 private[gcn]
+class FeaturePartition(index: Int, keys: Array[Long], features: Array[IntFloatVector],
+                       testRatio: Float, numLabels: Int, torchModelPath: String)
+  extends GraphAdjPartition(index, keys, null, null) {
+
+  def toSemiGAMLPPartition(model: GNNPSModel, isTraining: Boolean): GAMLPPartition = {
+    val before = System.currentTimeMillis()
+    val (trainIdx, testIdx, trainLabels, testLabels) = makeTrainTest(model, isTraining, testRatio, numLabels)
+    println(s"calc train/test labels cost ${System.currentTimeMillis() - before} ms.")
+    new GAMLPPartition(index, keys, features, trainIdx, trainLabels, testIdx, testLabels, torchModelPath)
+  }
+}
+
+private[gcn]
 object GraphAdjPartition {
   def apply(index: Int, iterator: Iterator[(Long, Iterable[Long])]): GraphAdjPartition = {
     val indptr = new IntArrayList()
@@ -672,5 +704,24 @@ object Index2NodePartition {
       nodes.set(entry._1, entry._2)
     }
     new Index2NodePartition(index, nodes)
+  }
+}
+
+object FeaturePartition {
+  def apply(index: Int, iterator: Iterator[(Long, String)], featureDim: Int, dataFormat: String = "dense",
+            testRatio: Float, numLabels: Int, torchModelPath: String): FeaturePartition = {
+    val before = System.currentTimeMillis()
+    val keys = new LongArrayList()
+    val features = new ArrayBuffer[IntFloatVector]()
+
+    while (iterator.hasNext) {
+      val entry = iterator.next()
+      val (node, f) = (entry._1, entry._2)
+      keys.add(node)
+      features.append(SampleParser.parseFeature(f, featureDim, dataFormat))
+    }
+    println(s"partition $index, create feature partition cost ${System.currentTimeMillis() - before} ms.")
+    new FeaturePartition(index, keys.toLongArray, features.toArray, testRatio, numLabels, torchModelPath)
+
   }
 }

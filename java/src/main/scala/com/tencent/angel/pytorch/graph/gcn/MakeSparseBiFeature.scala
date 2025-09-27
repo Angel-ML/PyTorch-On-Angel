@@ -97,6 +97,24 @@ object MakeSparseBiFeature {
     }
   }
 
+  def makeFeatures(featureDim: Int,
+                   features: Array[IntFloatVector], dense: Boolean): Array[Float] = {
+    val size = features.length
+    val x = new Array[Float](size * featureDim)
+    if (dense) {
+      features.zipWithIndex.foreach{ case (f, i) =>
+        val feat = if (f == null) new IntFloatVector(featureDim, new IntFloatDenseVectorStorage(featureDim)) else f
+        makeFeature(i * featureDim, feat, x)
+      }
+    } else {
+      features.zipWithIndex.foreach{ case (f, i) =>
+        val feat = if (f == null) new IntFloatVector(featureDim, new IntFloatSortedVectorStorage(featureDim)) else f
+        makeFeature(i * featureDim, feat, x)
+      }
+    }
+    x
+  }
+
   def sampleFeatures(size: Int, featureDim: Int, model: GNNPSModel, graphType: Int,
                      dataFormat: String, params: util.HashMap[String, Object], fieldNum: Int,
                      fieldMultiHot: Boolean = false): (Array[Float], Array[Int], Array[Int]) = {

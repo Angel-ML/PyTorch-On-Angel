@@ -13,12 +13,10 @@ object GAMLPExample {
 
   def main(args: Array[String]): Unit = {
     val params = ArgsUtil.parse(args)
-    val edgeInput = params.getOrElse("edgePath", "")
     val featureInput = params.getOrElse("featurePath", "")
     val labelPath = params.getOrElse("labelPath", "")
     val testLabelPath = params.getOrElse("testLabelPath", "")
     val predictOutputPath = params.getOrElse("predictOutputPath", "")
-    val embeddingPath = params.getOrElse("embeddingPath", "")
     val outputModelPath = params.getOrElse("outputModelPath", "")
     val featureEmbedInputPath = params.getOrElse("featureEmbedInputPath", "")
     val fieldNum = params.getOrElse("fieldNum", "-1").toInt
@@ -36,8 +34,7 @@ object GAMLPExample {
     val useBalancePartition = params.getOrElse("useBalancePartition", "false").toBoolean
     val numEpoch = params.getOrElse("numEpoch", "10").toInt
     val testRatio = params.getOrElse("testRatio", "0.5").toFloat
-    val format = params.getOrElse("format", "sparse")
-    val numSamples = 1
+    val format = params.getOrElse("format", "dense")
     val storageLevel = params.getOrElse("storageLevel", "MEMORY_ONLY")
     val numBatchInit = params.getOrElse("numBatchInit", "5").toInt
     val actionType = params.getOrElse("actionType", "train")
@@ -72,11 +69,18 @@ object GAMLPExample {
     conf.set("spark.executorEnv.OMP_NUM_THREADS", "2")
     conf.set("spark.executorEnv.MKL_NUM_THREADS", "2")
 
+    // angel.embedding.normalized
+    if (actionType == "train" && conf.get("spark.hadoop.angel.embedding.normalized", "false").toBoolean) {
+      conf.set("spark.hadoop.angel.embedding.normalized", "true")
+    } else {
+      conf.set("spark.hadoop.angel.embedding.normalized", "false")
+    }
+
     val sc = new SparkContext(conf)
 
     //auto-adjust numPartitions and psNumPartition
     numPartitions = PartitionUtils.getDataPartitionNum(numPartitions, conf, numPartitionsFactor)
-    psNumPartition = PartitionUtils.getPsPartitionNum(psNumPartition, conf, psNumPartitionFactor)
+    psNumPartition = PartitionUtils.getPsPartitionNum(psNumPartition, conf, psNumPartitionFactor, featureEmbedInputPath)
     println(s"numPartition: $numPartitions, numPsPartition: $psNumPartition")
 
     torchModelPath = FileUtils.getPtName("./")
@@ -96,7 +100,6 @@ object GAMLPExample {
     gamlp.setStorageLevel(storageLevel)
     gamlp.setTestRatio(testRatio)
     gamlp.setDataFormat(format)
-    gamlp.setNumSamples(numSamples)
     gamlp.setNumBatchInit(numBatchInit)
     gamlp.setPeriods(periods)
     gamlp.setCheckpointInterval(checkpointInterval)
@@ -113,7 +116,6 @@ object GAMLPExample {
     gamlp.setFieldNum(fieldNum)
     gamlp.setFieldMultiHot(fieldMultiHot)
 
-    val edges = GraphIO.load(edgeInput, isWeighted = false, sep = sep)
     val features = IOFunctions.loadFeature(featureInput, sep = "\t")
     val labels = if (labelPath.length > 0) {
       Option(if (numLabels > 1) IOFunctions.loadMultiLabel(labelPath, sep = "p") else IOFunctions.loadLabel(labelPath, sep=labelSep))
@@ -122,8 +124,7 @@ object GAMLPExample {
       Option(if (numLabels > 1) IOFunctions.loadMultiLabel(testLabelPath, sep = "p") else IOFunctions.loadLabel(testLabelPath, sep=labelSep))
     else None
 
-    val (model, graph) = gamlp.initialize(edges, features, labels, testLabels)
-    gamlp.showSummary(model, graph)
+    val (model, graph) = gamlp.initialize(features, labels, testLabels)
 
     if (actionType == "train")
       gamlp.fit(model, graph, outputModelPath)
@@ -131,11 +132,6 @@ object GAMLPExample {
     if (predictOutputPath.length > 0) {
       val predict = gamlp.genLabels(model, graph)
       GraphIO.save(predict, predictOutputPath, seq = " ")
-    }
-
-    if (embeddingPath.length > 0) {
-      val embedding = gamlp.genEmbedding(model, graph)
-      GraphIO.save(embedding, embeddingPath, seq = " ")
     }
 
     if (actionType == "train" && outputModelPath.length > 0) {
