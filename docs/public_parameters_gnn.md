@@ -108,3 +108,4 @@ Property Name | Result for predictOutputPath | Result for EmbeddingPath
 **Unsupervised Bipartite GraphSage** | - | node embedding
 **HGAT** | - | node embedding
 **IGMC** | src dst label | -
+**GATNE** | - | node embedding
