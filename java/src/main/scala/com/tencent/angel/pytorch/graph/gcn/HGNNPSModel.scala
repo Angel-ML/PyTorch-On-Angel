@@ -6,7 +6,7 @@ import com.tencent.angel.graph.client.psf.init.initedgeweights.InitEdgeWeightsBy
 import com.tencent.angel.graph.client.psf.init.{GeneralInitByNameParam, GeneralInitParam}
 import com.tencent.angel.graph.client.psf.init.initneighbors.{InitAliasTableByName, InitNeighborByName}
 import com.tencent.angel.graph.client.psf.init.initnodefeats.InitMultiNodeFeats
-import com.tencent.angel.graph.client.psf.sample.sampleneighbor.{SampleMethod, SampleNeighborByName, SampleNeighborByNameParam, SampleNeighborResult}
+import com.tencent.angel.graph.client.psf.sample.sampleneighbor.{SampleNeighborByName, SampleNeighborByNameParam, SampleNeighborResult}
 import com.tencent.angel.graph.client.psf.sample.samplenodefeats.{SampleNodeFeat, SampleNodeFeatParam, SampleNodeFeatResult}
 import com.tencent.angel.graph.client.psf.universalembedding.{UniversalEmbeddingExtraInitParam, _}
 import com.tencent.angel.graph.common.param.ModelContext
@@ -37,8 +37,7 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
                   labels: Map[String, PSVector],
                   testLabels: Map[String, PSVector],
                   embeddings: Map[String, PSMatrix],
-                  embedDims: Map[String, Int],
-                  storageTypes: Map[String, NeighborStorageType]) extends
+                  embedDims: Map[String, Int]) extends
   GNNPSModel(null, weights, null, null) {
 
   // the default pull method will return keys even those not exists on servers
@@ -50,7 +49,7 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
 
   // this method will not return keys that do not exist on servers
   def readLabels2(name:String, keys: Array[Long]): LongFloatVector = {
-    import com.tencent.angel.spark.ml.psf.gcn.{GetLabels, GetLabelsResult}
+    import com.tencent.angel.graph.psf.gcn.{GetLabels, GetLabelsResult}
     if (labels != null && labels.contains(name) && keys != null) {
       val func = new GetLabels(labels.getOrElse(name, null).poolId, keys.clone())
       labels.getOrElse(name, null).psfGet(func).asInstanceOf[GetLabelsResult].getVector
@@ -58,7 +57,7 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
   }
 
   def readTestLabels(name: String, keys: Array[Long]): LongFloatVector = {
-    import com.tencent.angel.spark.ml.psf.gcn.{GetLabels, GetLabelsResult}
+    import com.tencent.angel.graph.psf.gcn.{GetLabels, GetLabelsResult}
     if (testLabels != null && testLabels.contains(name) && keys != null) {
       val func = new GetLabels(testLabels.getOrElse(name, null).poolId, keys.clone())
       testLabels.getOrElse(name, null).psfGet(func).asInstanceOf[GetLabelsResult].getVector
@@ -103,11 +102,7 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
   def initNeighborsByBatch(graph: PSMatrix, batchKeys: Array[Long], batchNeighbors: Array[Array[Long]], name: String): Unit = {
     val neighbors = new Array[IElement](batchKeys.length)
     for (i <- batchNeighbors.indices) {
-      if (storageTypes.getOrElse(name, NeighborStorageType.LONGARRAY) == NeighborStorageType.LONGARRAY) {
-        neighbors(i) = new LongNeighbor(batchNeighbors(i))
-      } else {
-        neighbors(i) = new IntNeighbor(batchNeighbors(i).map(_.toInt))
-      }
+      neighbors(i) = new LongNeighbor(batchNeighbors(i))
     }
 
     val func = new InitNeighborByName(new GeneralInitByNameParam(graph.id, batchKeys, neighbors, name))
@@ -163,7 +158,7 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
     println(s"init ${neighborTable.length} alias table...")
   }
 
-  def initNodeFeatures(keys: Array[Long], features: Array[Feature],
+  def initNodeFeatures(keys: Array[Long], features: Array[IntFloatVector],
                        graphName: String, numBatch: Int): Unit = {
     val step = if (keys.length > numBatch) keys.length / numBatch else 1
     assert(step > 0)
@@ -175,26 +170,21 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
     }
   }
 
-  def initNodeFeaturesByBatch(batchKeys: Array[Long], batchFeatures: Array[Feature], graphName: String): Unit = {
+  def initNodeFeaturesByBatch(batchKeys: Array[Long], batchFeatures: Array[IntFloatVector], graphName: String): Unit = {
     val graph = graphs.getOrElse(graphName, null.asInstanceOf[PSMatrix])  // choose userGraph or itemGraph
     val features = new Array[IElement](batchFeatures.length)
     for (i <- features.indices) {
-      features(i) = batchFeatures(i)
+      features(i) = new Feature(batchFeatures(i))
     }
 
     val func = new InitMultiNodeFeats(new GeneralInitParam(graph.id, batchKeys, features))
     graph.asyncPsfUpdate(func).get()
   }
 
-  def getFeatures(keys: Array[Long], graphName: String): Long2ObjectOpenHashMap[FloatVector] = {
-    getFeatures(keys, graphName, FeatureFormat.DENSE)._1
-  }
-
-  def getFeatures(keys: Array[Long], graphName: String, featureFormat: FeatureFormat): (Long2ObjectOpenHashMap[FloatVector], Long2ObjectOpenHashMap[FloatVector]) = {
+  def getFeatures(keys: Array[Long], graphName: String): Long2ObjectOpenHashMap[IntFloatVector] = {
     val graph = graphs.getOrElse(graphName, null.asInstanceOf[PSMatrix])  // choose userGraph or itemGraph
-    val res = graph.psfGet(new GetMultiNodeFeats(new GetNodeAttrsParam(graph.id, keys, featureFormat)))
-      .asInstanceOf[GetNodeFeatsResult]
-    (res.getnodeIdToFeats(0), res.getnodeIdToFeats(1))
+    graph.psfGet(new GetMultiNodeFeats(new GetNodeAttrsParam(graph.id, keys)))
+      .asInstanceOf[GetNodeFeatsResult].getnodeIdToFeats()
   }
 
   def sampleFeatures(size: Int, graphName: String): Array[FloatVector] = {
@@ -212,12 +202,11 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
     features
   }
 
-  def sampleNeighbors(keys: Array[Long], count: Int, edgeName: String, sampleMethod: SampleMethod): Long2ObjectOpenHashMap[Neighbor] = {
+  def sampleNeighbors(keys: Array[Long], count: Int, edgeName: String): Long2ObjectOpenHashMap[Array[Long]] = {
     val nodes = edgeName.split("-")
     val graph = graphs.getOrElse(nodes(0), null.asInstanceOf[PSMatrix])
-    val storageType = storageTypes.getOrElse(nodes(0), NeighborStorageType.LONGARRAY)
 
-    graph.psfGet(new SampleNeighborByName(new SampleNeighborByNameParam(graph.id, keys, count, nodes(1), sampleMethod, storageType)))
+    graph.psfGet(new SampleNeighborByName(new SampleNeighborByNameParam(graph.id, keys, count, nodes(1))))
       .asInstanceOf[SampleNeighborResult].getNodeIdToSampleNeighbors
   }
 
@@ -342,8 +331,6 @@ class HGNNPSModel(graphs: Map[String, PSMatrix],
     }
     CheckpointUtils.checkpoint(checkpointId, matrixNames.toArray)
   }
-
-  def getNeighborStorageTypes(): Map[String,NeighborStorageType] = storageTypes
 }
 
 object HGNNPSModel {
@@ -426,10 +413,6 @@ object HGNNPSModel {
       }.toMap
     } else null
 
-    val storageTypes = nodesMap.map{ case (name, (minId, maxId)) =>
-      (name, if (minId > Int.MinValue && maxId < Int.MaxValue) NeighborStorageType.INTARRAY else NeighborStorageType.LONGARRAY)
-    }.toMap
-
-    new HGNNPSModel(graphs, weightsVec, labels, testLabels, embeddings, embedDims, storageTypes)
+    new HGNNPSModel(graphs, weightsVec, labels, testLabels, embeddings, embedDims)
   }
 }

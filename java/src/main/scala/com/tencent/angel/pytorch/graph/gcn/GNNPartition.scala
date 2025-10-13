@@ -17,12 +17,12 @@
 package com.tencent.angel.pytorch.graph.gcn
 
 import java.util.{Random, Map => JMap}
-
 import com.tencent.angel.ml.math2.storage.IntFloatSparseVectorStorage
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 
 class GNNPartition(index: Int,
                    keys: Array[Long],
@@ -195,7 +195,26 @@ class GNNPartition(index: Int,
     }
   }
 
-  def sampleTrainData(indices: Range, ratio: Float): IndexedSeq[Int] = {
+  def makeEmbeddingGrads(grad: Array[Float],
+                         featIds: Array[Long], embeddingDim: Int): Long2ObjectOpenHashMap[Array[Float]] = {
+
+    val counts = featIds.map(f => (f, 1)).groupBy(f => f._1).map(f => (f._1, f._2.size))
+    val grads = new Long2ObjectOpenHashMap[Array[Float]](counts.size)
+
+    for (i <- featIds.indices) {
+      val idx = featIds(i)
+      val embedding = grads.getOrDefault(idx, new Array[Float](embeddingDim))
+      embedding.indices.foreach(j => embedding(j) += grad(i * embeddingDim + j))
+    }
+
+    for (pair <- counts) {
+      val embedding = grads.get(pair._1)
+      embedding.indices.foreach(i => embedding(i) /= pair._2.toFloat)
+    }
+    grads
+  }
+
+  def sampleTrainData(indices: Array[Int], ratio: Float): IndexedSeq[Int] = {
     if (ratio == 1.0f) {
       indices
     } else {

@@ -1,6 +1,5 @@
 package com.tencent.angel.pytorch.graph.gcn
-import com.tencent.angel.graph.client.psf.sample.sampleneighbor.SampleMethod
-import com.tencent.angel.graph.data.{EmbeddingOrGrad, FeatureFormat}
+import com.tencent.angel.graph.data.EmbeddingOrGrad
 import com.tencent.angel.ml.math2.vector.IntIntVector
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
@@ -19,8 +18,7 @@ import scala.util.Random
 
 class GATNEPartition(index: Int,
                      pairs: Map[Int, Array[(Long, Long, Int)]],   // src, dst, edge_Type
-                     torchModelPath: String,
-                     dataFormat: FeatureFormat) extends Serializable {
+                     torchModelPath: String) extends Serializable {
   var totalCallNum: Long = 0
 
   def trainEpoch(model: EmbeddingGNNPSModel,
@@ -37,7 +35,6 @@ class GATNEPartition(index: Int,
                  contextDim: Int,
                  numNegative: Int,
                  numSampleMap: Map[Int, Int],
-                 sampleMethod: SampleMethod,
                  logStep: Int,
                  localSample: Boolean,
                  negSampleByNodeType: Boolean,
@@ -54,7 +51,7 @@ class GATNEPartition(index: Int,
         val batch = batchIterator.next()
         val data = GATNEPartition.parseBatchData(model, batch, numNegative, localSample, negSampleByNodeType, maxIndex, maxIndexMap, minIndexMap)
         val loss = trainBatch(data._1, data._2, data._3, data._4, model, type_id, optim, torch, all_nodeTypes, all_edgeTypes, schema, featureDimsMap,
-          embedDimsMap, fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, contextDim, numNegative, numSampleMap, sampleMethod, logStep)
+          embedDimsMap, fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, contextDim, numNegative, numSampleMap, logStep)
         lossSum += loss // * batch.length
         numStep += 1
       }
@@ -107,12 +104,11 @@ class GATNEPartition(index: Int,
                  contextDim: Int,
                  numNegative: Int,
                  numSampleMap: Map[Int, Int],
-                 sampleMethod: SampleMethod,
                  logStep: Int): Double = {
     incCallNum()
     val (params, context_x, dstIndex) = makeParams(srcNodes, dstNodes, src_type, edgeTypes, negs, featureDimsMap,
       embedDimsMap, fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, model, all_nodeTypes, all_edgeTypes, schema,
-      contextDim, numNegative, numSampleMap, sampleMethod)
+      contextDim, numNegative, numSampleMap)
     val weights = model.readWeights()
     params.put("weights", weights)
     params.put("src_type", new Integer(src_type))
@@ -164,8 +160,7 @@ class GATNEPartition(index: Int,
                         fieldMultiHot: Boolean,
                         contextDim: Int,
                         numNegative: Int,
-                        numSampleMap: Map[Int, Int],
-                        sampleMethod: SampleMethod): Array[(Long, Int, Array[Float])] = {
+                        numSampleMap: Map[Int, Int]): Array[(Long, Int, Array[Float])] = {
     val weights = model.readWeights()
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()
@@ -181,7 +176,7 @@ class GATNEPartition(index: Int,
         override def next: Array[(Long, Int, Array[Float])] = {
           val batch = batchIterator.next().toArray
           val output = genEmbeddingBatch(batch, model, type_id, weights, torch, all_nodeTypes, all_edgeTypes, schema,
-            featureDimsMap, embedDimsMap, fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, contextDim, numNegative, numSampleMap, sampleMethod)
+            featureDimsMap, embedDimsMap, fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, contextDim, numNegative, numSampleMap)
           output.toArray
         }
       }
@@ -204,14 +199,13 @@ class GATNEPartition(index: Int,
                         fieldMultiHot: Boolean,
                         contextDim: Int,
                         numNegative: Int,
-                        numSampleMap: Map[Int, Int],
-                        sampleMethod: SampleMethod): Iterator[(Long, Int, Array[Float])] = {
+                        numSampleMap: Map[Int, Int]): Iterator[(Long, Int, Array[Float])] = {
     val srcNodes = batch.map(f => f._1)
     val dstNodes = batch.map(f => f._2)
     val edgeTypes = batch.map(f => f._3)
     val (params, _, _) = makeParams(srcNodes, dstNodes, src_type, edgeTypes, null, featureDimsMap, embedDimsMap,
       fieldNumsMap, featureSplitIdxsMap, fieldMultiHot, model, all_nodeTypes, all_edgeTypes, schema, contextDim,
-      numNegative, numSampleMap, sampleMethod, false)
+      numNegative, numSampleMap, false)
 
     params.put("weights", weights)
     params.put("src_type", new Integer(src_type))
@@ -243,7 +237,6 @@ class GATNEPartition(index: Int,
                  contextDim: Int,
                  numNegative: Int,
                  numSampleMap: Map[Int, Int],
-                 sampleMethod: SampleMethod,
                  training: Boolean = true): (JMap[String, Object], Array[Float], Long2IntOpenHashMap) = {
     val nodeIndexsMap = new mutable.HashMap[Int, Long2IntOpenHashMap]()
     all_nodeTypes.foreach(name => nodeIndexsMap.put(name, new Long2IntOpenHashMap()))
@@ -255,14 +248,13 @@ class GATNEPartition(index: Int,
     }
     nodeIndexsMap.update(src_type, srcIndex)
 
-    val (srcNodesIndex, neighborIndex, neighborNum, neighborType, neighborFlag) = MakeEdgeIndex.makeNeighborIndex(srcNodes, src_type, nodeIndexsMap,
-      numSampleMap, model, sampleMethod, all_edgeTypes, schema)
+    val (srcNodesIndex, neighborIndex, neighborNum, neighborType, neighborFlag) =
+      MakeEdgeIndex.makeNeighborIndex(srcNodes, src_type, nodeIndexsMap,
+      numSampleMap, model, all_edgeTypes, schema)
     // pull features for each type neighbor
     val featsMap = new ArrayBuffer[Array[Float]]()
-    val featsDenseMap = new ArrayBuffer[Array[Float]]()
     val batchIdsMap = new ArrayBuffer[Array[Int]]()
     val fieldIdsMap = new ArrayBuffer[Array[Int]]()
-    val featureSplitIdxs = new ArrayBuffer[Int]()
     val featDims = new ArrayBuffer[Int]()
     val embedDims = new ArrayBuffer[Int]()
 
@@ -271,20 +263,15 @@ class GATNEPartition(index: Int,
       val featureDim = featureDimsMap.getOrElse(type_id, -1)
       val fieldDim = fieldNumsMap.getOrElse(type_id, -1)
       val embedDim = embedDimsMap.getOrElse(type_id, -1)
-      val splitIdx = featureSplitIdxsMap.getOrElse(type_id, -1)
 
-      val (feat, feat_dense, b, f) = if (index.size() != 0)
-        MakeSparseBiFeature.makeFeatures(index, featureDim, model, type_id, params, fieldDim, fieldMultiHot, embedDim, dataFormat, splitIdx)
-      else (new Array[Float](0), new Array[Float](0), new Array[Int](0), new Array[Int](0))
+      val (feat, b, f) = if (index.size() != 0)
+        MakeSparseBiFeature.makeFeatures(index, featureDim, model, type_id, params, fieldDim, fieldMultiHot)
+      else (new Array[Float](0), new Array[Int](0), new Array[Int](0))
 
       featsMap.append(feat)
       if (fieldDim > 0) {
         batchIdsMap.append(b)
         fieldIdsMap.append(f)
-      }
-      if (dataFormat == FeatureFormat.DENSE_HIGH_SPARSE) {
-        featsDenseMap.append(feat_dense)
-        featureSplitIdxs.append(splitIdx)
       }
       featDims.append(featureDim)
       embedDims.append(embedDim)
@@ -325,10 +312,6 @@ class GATNEPartition(index: Int,
       params.put("fieldIds", fieldIdsMap.toArray)
       params.put("batchIds_size", new Integer(batchIdsMap.length))
     }
-    if (dataFormat == FeatureFormat.DENSE_HIGH_SPARSE) {
-      params.put("feats_dense", featsDenseMap.toArray)
-      params.put("feature_dense_dims", featureSplitIdxs.toArray)
-    }
 
     (params, context_x, dstIndex)
   }
@@ -339,8 +322,7 @@ private[gcn]
 object GATNEPartition {
   def apply(index: Int,
             iterator: Iterator[(Long, Long, Int, Int)],
-            torchModelPath: String,
-            dataFormat: FeatureFormat): GATNEPartition = {
+            torchModelPath: String): GATNEPartition = {
     val pairs = new mutable.HashMap[Int, ArrayBuffer[(Long, Long, Int)]]()
     while (iterator.hasNext) {
       val entry = iterator.next()
@@ -349,7 +331,7 @@ object GATNEPartition {
       pair.append((src, dst, edge_type))
       pairs.update(src_type, pair)
     }
-    new GATNEPartition(index, pairs.map(p => (p._1, p._2.toArray)).toMap, torchModelPath, dataFormat)
+    new GATNEPartition(index, pairs.map(p => (p._1, p._2.toArray)).toMap, torchModelPath)
   }
 
   def parseBatchData(model: EmbeddingGNNPSModel,

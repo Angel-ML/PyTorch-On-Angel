@@ -69,6 +69,22 @@ public class Torch {
 
   public static native int[] getSparseColNums(long ptr);
 
+  public static native String getMetaPaths(long ptr);
+
+  public static native String getTotalNodes(long ptr);
+
+  public static native int getMaxLen(long ptr);
+
+  public static native int getHiddenDim(long ptr);
+
+  public static native String getFieldNums(long ptr);
+
+  public static native String getFeatEmbedDims(long ptr);
+
+  public static native String getFeatureDims(long ptr);
+
+  public static native String getFeatureSplitIdxs(long ptr);
+
   /* forward */
   public static native float[] forward(long ptr, Map<String, Object> params, boolean serving);
 

@@ -74,7 +74,7 @@ class DGIPartition(index: Int,
                  fieldNum: Int,
                  fieldMultiHot: Boolean,
                  trainRatio: Float): (Double, Long, Int) = {
-    val batchIterator = sampleTrainData(keys.indices, trainRatio).sliding(batchSize, batchSize)
+    val batchIterator = sampleTrainData(keys.indices.toArray, trainRatio).sliding(batchSize, batchSize)
     var lossSum = 0.0
     TorchModel.setPath(torchModelPath)
     val torch = TorchModel.get()

@@ -27,9 +27,8 @@ class BiSAGEConv(torch.jit.ScriptModule):
         # bipartite graph, two types of nodes, namely u,i. Edges: (u, i)
 
         self.neigh_weight = Parameter(
-            torch.zeros(neigh_dim, in_dim))  # transform matrix
-        self.weight = Parameter(
-            torch.zeros(in_dim * 2, out_dim))  # weight matrix
+            torch.zeros(neigh_dim, out_dim))  # transform matrix
+        self.weight = Parameter(torch.zeros(in_dim + out_dim, out_dim))
         self.bias = Parameter(torch.zeros(out_dim))
         self.activation = torch.nn.ELU()
         self.reset_parameters()
@@ -45,9 +44,9 @@ class BiSAGEConv(torch.jit.ScriptModule):
         row, col = edge_index[0], edge_index[1]
         # do not set dim_size
         neighborhood = scatter_mean(neigh[col], row, dim=0)
-        neighborhood = torch.matmul(neighborhood, self.neigh_weight)
+        neighborhood = torch.mm(neighborhood, self.neigh_weight)
         out = torch.cat([x[0:neighborhood.size(0)], neighborhood], dim=1)
-        out = torch.matmul(out, self.weight)
+        out = torch.mm(out, self.weight)
         out = out + self.bias
 
         out = self.activation(out)

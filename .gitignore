@@ -2,6 +2,7 @@ java/.idea
 java/target
 java/pytorch-on-angel.iml
 python/*.pt
+python/graph/*.pt
 python/.idea
 cpp/cmake-build-debug
 cpp/.idea
@@ -10,3 +11,4 @@ python/__pycache__
 .idea
 output
 dist
+examples/target

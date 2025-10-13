@@ -26,9 +26,10 @@ object PartitionUtils {
     if (numPartitions > cores * factor) numPartitions else cores * factor
   }
 
-  def getPsPartitionNum(psNumPartitions: Int, conf: SparkConf, factor: Int = 2): Int = {
+  def getPsPartitionNum(psNumPartitions: Int, conf: SparkConf, factor: Int = 2, modelLoadPath: String = ""): Int = {
     val numPs = conf.get("spark.ps.instances").toInt
     val numPsCores = conf.get("spark.ps.cores").toInt
-    if (psNumPartitions > numPs * numPsCores * factor) psNumPartitions else numPs * numPsCores * factor
+    val psPartNums = if (psNumPartitions > numPs * numPsCores * factor) psNumPartitions else numPs * numPsCores * factor
+    ModelUtils.recountPartition(psPartNums, modelLoadPath)
   }
 }

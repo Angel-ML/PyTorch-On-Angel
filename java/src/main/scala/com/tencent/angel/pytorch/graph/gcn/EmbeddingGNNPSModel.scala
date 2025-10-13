@@ -1,6 +1,5 @@
 package com.tencent.angel.pytorch.graph.gcn
 
-import com.carrotsearch.hppc.LongArrayList
 import com.tencent.angel.exception.InvalidParameterException
 import com.tencent.angel.graph.client.psf.get.utils.GetNodeAttrsParam
 import com.tencent.angel.graph.client.psf.init.GeneralInitParam
@@ -24,7 +23,7 @@ import com.tencent.angel.spark.ml.util.LogUtils
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import org.apache.spark.SparkContext
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
+import it.unimi.dsi.fastutil.longs.{Long2ObjectOpenHashMap, LongArrayList}
 import org.apache.spark.rdd.RDD
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
@@ -115,7 +114,7 @@ class EmbeddingGNNPSModel(graph: PSMatrix,
         batchNeighbors.append(neighbors)
         splitStart += 1
       }
-      initNeighborsByBatch(batchKeys.toArray, batchNeighbors.toArray)
+      initNeighborsByBatch(batchKeys.toLongArray, batchNeighbors.toArray)
       start += step
     }
   }
@@ -136,14 +135,13 @@ class EmbeddingGNNPSModel(graph: PSMatrix,
   def sampleNeighborsByType(keys: Array[Long],
                             count: Int = -1,
                             sampleType: SampleType = SampleType.NODE,
-                            node_or_edge_type: Int = -1,
-                            sampleMethod: SampleMethod = SampleMethod.RANDOM): Long2ObjectOpenHashMap[Neighbor] = {
+                            node_or_edge_type: Int = -1): Long2ObjectOpenHashMap[Array[Long]] = {
     if(sampleType == SampleType.SIMPLE) {
       throw new InvalidParameterException("Sample with type only support type: NODE, EDGE and NODE_AND_EDGE");
     }
 
     val result = graph.psfGet(
-      new SampleNeighborByType(new SampleNeighborByTypeParam(graph.id, keys, count, sampleType, node_or_edge_type, sampleMethod, NeighborStorageType.LONGARRAY)))
+      new SampleNeighborByType(new SampleNeighborByTypeParam(graph.id, keys, count, sampleType, node_or_edge_type)))
       .asInstanceOf[SampleNeighborResultByType]
     result.getNodeIdToSampleNeighbors
   }

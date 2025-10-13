@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList
 import it.unimi.dsi.fastutil.ints.IntArrays
 import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, Long2ObjectOpenHashMap, LongArrayList, LongArrays, LongOpenHashSet}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 object MakeEdgeIndex {
@@ -890,4 +891,86 @@ object MakeEdgeIndex {
     (makeEdgeIndexFromSrcDst(srcs, dsts), edgeTypes.toLongArray, edgeWeights.toFloatArray, firstKeys)
   }
 
+  /*
+  Make edge Index for algorithms that pull first order neighbors from PS, for example GATNE.
+  */
+  def makeNeighborIndex(srcNodes: Array[Long],
+                        src_type: Int,
+                        nodeIndexsMap: mutable.HashMap[Int, Long2IntOpenHashMap],
+                        numSampleMap: Map[Int, Int],
+                        model: EmbeddingGNNPSModel,
+                        all_edgeTypes: Array[Int],
+                        schema: Map[(Int, Int), Int]): (Array[Long], Array[Array[Long]], Array[Int], Array[Long], Array[Long]) = {
+    val srcNodesIndex = new LongArrayList()
+    val neighborArray = new ArrayBuffer[Array[Long]]()
+    val neighborNums = new ArrayBuffer[Int]()
+    val neighborType = new LongArrayList()
+    val neighborFlag = new LongArrayList()
+
+    var srcIndex = nodeIndexsMap.getOrElse(src_type, new Long2IntOpenHashMap())
+    for (src <- srcNodes) {
+      val index = srcIndex.get(src)
+      srcNodesIndex.add(index)
+    }
+
+    all_edgeTypes.foreach( edge_type => {
+      var count = 0
+      val numSample = numSampleMap.getOrElse(edge_type, 0)
+      val neighborIndex = new LongArrayList()
+      val nodeNeighbors = model.sampleNeighborsByType(srcNodes.distinct, numSample, SampleType.EDGE, edge_type)
+      val neighbor_type = schema.getOrElse((src_type, edge_type), src_type)
+      val index = nodeIndexsMap.getOrElse(neighbor_type, new Long2IntOpenHashMap())
+      for (src <- srcNodes) {
+        val neighbors = nodeNeighbors.get(src)
+        if (neighbors.length == 0) {
+          count += 1
+          for (t <- 0 until numSample) {
+            neighborIndex.add(srcIndex.get(src))
+          }
+          neighborType.add(src_type)
+        } else {
+          for (i <- neighbors.indices) {
+            if (!index.containsKey(neighbors(i))) {
+              index.put(neighbors(i), index.size())
+            }
+            neighborIndex.add(index.get(neighbors(i)))
+          }
+          neighborType.add(neighbor_type)
+        }
+      }
+      nodeIndexsMap.update(neighbor_type, index)
+      if (count == 0 || count == srcNodes.length || src_type == neighbor_type) {
+        neighborFlag.add(1)
+      } else {
+        neighborFlag.add(0)
+      }
+      neighborArray.append(neighborIndex.toLongArray)
+      neighborNums.append(numSample)
+    })
+    (srcNodesIndex.toLongArray, neighborArray.toArray, neighborNums.toArray, neighborType.toLongArray, neighborFlag.toLongArray)
+  }
+
+  /*
+  Make edge Index for algorithms that need negative samples, for example word2vec, GATNE.
+  */
+  def makeNegativeIndex(dstNodes: Array[Long],
+                        negs: Array[Array[Long]],
+                        dstIndex: Long2IntOpenHashMap): (Array[Long], Array[Long]) = {
+    val dstNodesIndex = new LongArrayList()
+    val negsIndex = new LongArrayList()
+    for (dst <- dstNodes) {
+      val index = dstIndex.get(dst)
+      dstNodesIndex.add(index)
+    }
+
+    for (negArray <- negs) {
+      for (negNode <- negArray) {
+        if (!dstIndex.containsKey(negNode)) {
+          dstIndex.put(negNode, dstIndex.size())
+        }
+        negsIndex.add(dstIndex.get(negNode))
+      }
+    }
+    (dstNodesIndex.toLongArray, negsIndex.toLongArray)
+  }
 }

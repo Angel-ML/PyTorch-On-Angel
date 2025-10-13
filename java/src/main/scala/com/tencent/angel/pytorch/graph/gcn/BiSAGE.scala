@@ -9,7 +9,6 @@ import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
 import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
@@ -252,7 +251,7 @@ class BiSAGE extends GNN with HasUserFeatureDim with HasItemFeatureDim with HasP
     torch.gcnSave(s"gcn-train-temp-${epoch}.pt", weights)
 
     val hdfsPath = new Path(path)
-    val conf = SparkHadoopUtil.get.newConfiguration(SparkEnv.get.conf)
+    val conf = SparkContext.getOrCreate().hadoopConfiguration
     val fs = hdfsPath.getFileSystem(conf)
     val outputPath = new Path(fs.makeQualified(hdfsPath).toUri.getPath)
     if (!fs.exists(outputPath)) {

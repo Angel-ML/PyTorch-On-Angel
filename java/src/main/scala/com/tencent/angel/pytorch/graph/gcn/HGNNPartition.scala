@@ -1,9 +1,6 @@
 package com.tencent.angel.pytorch.graph.gcn
 
 import java.util.{Map => JMap}
-
-import com.tencent.angel.graph.client.psf.sample.sampleneighbor.SampleMethod
-import com.tencent.angel.graph.data.FeatureFormat
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.pytorch.optim.AsyncOptim
 import com.tencent.angel.pytorch.torch.TorchModel
@@ -17,10 +14,8 @@ class HGNNPartition(index: Int,
                     aliasTables: Map[String, Map[Long, (Array[Float], Array[Int])]],
                     trainIdx: Map[String, Array[Int]],
                     torchModelPath: String,
-                    useSecondOrder: Boolean,
-                    dataFormat: FeatureFormat,
-                    sampleMethod: SampleMethod) extends
-  GNNPartition(index, null, null, null, torchModelPath, useSecondOrder, sampleMethod) {
+                    useSecondOrder: Boolean) extends
+  GNNPartition(index, null, null, null, torchModelPath, useSecondOrder) {
 
   /**
     * make node id for edge
@@ -172,7 +167,8 @@ class HGNNPartition(index: Int,
 
       override def next: Array[(Long, String)] = {
         val batch = batchIterator.next().toArray
-        val output = genEmbeddingBatch(batch, model, featureDimsMap, numSamplesMap, weights, torch, graphType, fieldNums, fieldMultiHot, metaPaths, nodeNameIds, filterSameNode, embedDims, featureSplitIdxs)
+        val output = genEmbeddingBatch(batch, model, featureDimsMap, numSamplesMap, weights, torch, graphType,
+          fieldNums, fieldMultiHot, metaPaths, nodeNameIds, filterSameNode, embedDims, featureSplitIdxs)
         output.toArray
       }
     }

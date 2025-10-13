@@ -325,13 +325,13 @@ public class SampleParser {
     return vals;
   }
 
-  public static Feature parseEmbedding(String line, String sep) {
+  public static IntFloatVector parseEmbedding(String line, String sep) {
     String[] parts = line.split(sep);
     float[] vals = new float[parts.length];
     for (int i = 0; i < parts.length; i++) {
       vals[i] = Float.parseFloat(parts[i]);
     }
 
-    return new Feature(VFactory.denseFloatVector(vals));
+    return VFactory.denseFloatVector(vals);
   }
 }

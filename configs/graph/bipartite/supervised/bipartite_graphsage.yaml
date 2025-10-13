@@ -1,0 +1,60 @@
+### 输入图的数据描述信息，包括节点特征、label以及输入边等
+graph:
+  name: "ml100k_gen"
+  nodes:
+    - name: "user"
+      feature:
+        format: "dense"
+        path: "hdfs://xx/ml100k_gen/users.csv"
+      label:
+        path: "hdfs://xx/ml100k_gen/labels.csv"
+        validate_path: ""
+    - name: "item"
+      feature:
+        format: "dense"
+        path: "hdfs://xx/ml100k_gen/items.csv"
+  edges:
+    base_config:
+      weighted: false
+      sep: "comma"
+    link_config:
+      - name: "u2i"
+        src: "user"
+        dst: "item"
+        path: "hdfs://xx/ml100k_gen/edgeTypes.csv"
+
+
+### GNN模型结构参数, model_name请勿修改, 完整参数请参考文档
+model:
+  model_name: "bipartite_graphsage"
+  input_user_dim: 2
+  input_item_dim: 19
+  hidden_dim: 128
+  output_dim: 2
+  encode: "dense"
+  task_type: "classification"
+  second: true
+
+
+### 模型训练所需参数，如batch_size, learning_rate, epoch等
+trainer:
+  epoch: 10
+  batch_size: 128
+  learning_rate: 0.01
+  decay: 0.01
+  test_ratio: 0.5
+  optimizer: "adam"
+  user_sample_num: 5
+  item_sample_num: 5
+  batch_init_num: 5
+  eval_metrics: "acc"
+  sample_method: "random"
+  validate_periods: 1
+  periods: 10
+  model_save_path: "hdfs://xx/semi_bi_graphsage_model"
+
+### 模型预测所需参数，如节点embedding生成路径，预测结果存储路径等
+predictor:
+  batch_size_multiplier: 10
+  node_embedding_output_path: "hdfs://xx/semi_bi_graphsage_embedding"
+  predict_output_path: "hdfs://xx/semi_bi_graphsage_predict"

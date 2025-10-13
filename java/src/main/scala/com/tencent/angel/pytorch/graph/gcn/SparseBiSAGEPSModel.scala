@@ -92,6 +92,7 @@ class SparseBiSAGEPSModel(userGraph: PSMatrix,
     println(s"save user (and item) feature embeddings(in the form of angel model) to $featEmbedPath.")
   }
 
+  override
   def loadFeatEmbed(featEmbedPath: String): Unit = {
     val ctx = new ModelLoadContext(featEmbedPath)
     val format = classOf[TextColumnFormat].getCanonicalName

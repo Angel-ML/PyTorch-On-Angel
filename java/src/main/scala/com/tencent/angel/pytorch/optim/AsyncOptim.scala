@@ -19,6 +19,7 @@ package com.tencent.angel.pytorch.optim
 import java.util.concurrent.Future
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
+import com.tencent.angel.ps.storage.vector.element.IElement
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
 abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
@@ -42,6 +43,12 @@ abstract class AsyncOptim(eta: Double, decay: Double) extends Serializable {
   def asyncUpdate(matrix: PSMatrix, offset: Int, rowIds: Array[Int], grads: Array[Vector]): Future[VoidResult]
 
   def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult]
+
+  def update(matrix: PSMatrix, nodeIds: Array[Long], grads: Array[IElement]) = {
+    asyncUpdate(matrix, nodeIds, grads).get
+  }
+
+  def asyncUpdate(matrix: PSMatrix, nodeIds: Array[Long], grads: Array[IElement]): Future[VoidResult]
 
   def getNumSlots(): Int
 

@@ -65,6 +65,7 @@ class SparseGNNPSModel(graph: PSMatrix,
     println(s"save feature embeddings(in the form of angel model) to $featEmbedPath.")
   }
 
+  override
   def loadFeatEmbed(featEmbedPath: String): Unit = {
     val ctx = new ModelLoadContext(featEmbedPath)
     val format = classOf[TextColumnFormat].getCanonicalName

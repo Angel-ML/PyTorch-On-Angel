@@ -6,7 +6,7 @@ trait HasNodeTypes extends Params {
 
   final val nodeTypes = new Param[String](this, "nodeTypes", "nodeType separated by comma")
 
-  final def getNodeTypes: String = $(nodeTypes)
+  final def getNodeTypes: Array[Int] = $(nodeTypes).split(",").map(_.toInt)
 
   setDefault(nodeTypes, "")
 

@@ -27,9 +27,9 @@
 
 #include <iostream>
 
-#include <jni.h>
-#include <torch/script.h>
 #include <torch/torch.h>
+#include <torch/script.h>
+#include <jni.h>
 
 namespace angel {
 
@@ -44,53 +44,62 @@ enum TorchModelType {
 };
 
 #ifdef LIBTORCH_VERSION_LATEST
-using OrModule = torch::jit::script::Module;
-using IValue = c10::IValue;
-using parameter_list = torch::jit::parameter_list;
-using module_list = torch::jit::module_list;
-using ModulePtr = c10::intrusive_ptr<c10::ivalue::Object>;
+    using OrModule = torch::jit::script::Module;
+    using IValue = c10::IValue;
+    using parameter_list = torch::jit::parameter_list;
+    using module_list = torch::jit::module_list;
+    using ModulePtr = c10::intrusive_ptr<c10::ivalue::Object>;
 
-struct WapperModule : public OrModule {
-  explicit WapperModule() {}
-  WapperModule(ModulePtr objPtr) : OrModule(std::move(objPtr)) {}
-  ~WapperModule() {}
-
-  IValue get_attribute(const std::string &name) const {
-    try {
-      return this->attr(name);
-    } catch (...) {
-      throw std::logic_error("No such attribute named as " + name);
-    }
-  }
-
-  parameter_list get_parameters() const { return this->parameters(); }
-
-  torch::autograd::Variable get_parameter(const std::string &name) const {
-    for (auto const &p : this->named_parameters()) {
-      if (name == p.name) {
-        return torch::autograd::as_variable_ref(p.value);
+    struct WapperModule : public OrModule{
+      explicit WapperModule() {}
+      WapperModule(ModulePtr objPtr) : OrModule(std::move(objPtr)) {}
+      ~WapperModule() {}
+      
+      IValue get_attribute(const std::string& name) const {
+        try{
+            return this->attr(name);
+        }
+        catch(...){
+            throw std::logic_error("No such attribute named as " + name);
+        }
       }
-    }
-  }
 
-  module_list get_modules() const { return this->modules(); }
-};
-#endif
+      parameter_list get_parameters() const {
+        return this->parameters();
+      }      
+      
+      torch::autograd::Variable get_parameter(const std::string& name) const {
+        for (auto const &p : this->named_parameters()){
+          if (name == p.name){
+            return static_cast<const torch::autograd::Variable&>(p.value);
+          }
+        }
+      }
+
+      module_list get_modules() const {
+        return this->modules();
+      } 
+    };
+#endif 
 
 class TorchModel {
-public:
+ public:
   explicit TorchModel(const std::string &path) {
 #ifdef LIBTORCH_VERSION_LATEST
-    OrModule m_ = torch::jit::load(path);
-    module_ = angel::WapperModule(std::move(m_._ivalue()));
+        OrModule m_ = torch::jit::load(path);
+        module_ = angel::WapperModule(std::move(m_._ivalue()));
 #else
-    module_ = torch::jit::load(path);
-#endif
+        module_ = torch::jit::load(path);
+#endif 
   }
 
-  void train() { module_.train(); }
+  void train() {
+    module_.train();
+  }
 
-  void eval() { module_.eval(); }
+  void eval() {
+    module_.eval();
+  }
 
   c10::IValue importance(std::vector<torch::jit::IValue> inputs) {
     return module_.get_method("importance_")(std::move(inputs));
@@ -100,12 +109,15 @@ public:
     return module_.get_method("forward_")(std::move(inputs));
   }
 
-  c10::IValue predict(std::vector<torch::jit::IValue> inputs) {
+  c10::IValue serving_predict(std::vector<torch::jit::IValue> inputs) {
+    return module_.get_method("serving_forward_")(std::move(inputs));
+  }
+
+   c10::IValue predict(std::vector<torch::jit::IValue> inputs) {
     return module_.get_method("predict_")(std::move(inputs));
   }
 
-  c10::IValue exec_method(const std::string &method,
-                          std::vector<torch::jit::IValue> inputs) {
+  c10::IValue exec_method(const std::string &method, std::vector<torch::jit::IValue> inputs) {
     return module_.get_method(method)(std::move(inputs));
   }
 
@@ -124,9 +136,13 @@ public:
       loss.backward();
       return loss.item().toFloat();
     } else if (outputs.isTuple()) {
-      auto elements = outputs.toTuple()->elements();
+#ifdef LIBTORCH_VERSION_GREATER_1_13_1
+       auto elements = (outputs.toTuple()->elements()).vec();
+#else
+       auto elements = outputs.toTuple()->elements();
+#endif
       if (targets.defined())
-        elements.emplace_back(targets);
+          elements.emplace_back(targets);
       auto loss = module_.get_method("loss")(elements).toTensor();
       loss.backward();
       return loss.item().toFloat();
@@ -155,7 +171,7 @@ public:
     std::vector<torch::jit::IValue> inputs;
     auto list = module_.get_method(method)(inputs).toIntList();
     std::vector<int> sizes;
-    for (auto const &f : list)
+    for (auto const &f: list)
       sizes.push_back(static_cast<int>(f));
     return sizes;
   }
@@ -177,21 +193,25 @@ public:
     return TorchModelType(-1);
   }
 
-  std::string get_type_string() { return get_string("get_type"); }
+  std::string get_type_string() {
+    return get_string("get_type");
+  }
 
   std::vector<int> get_mats_size() {
     std::vector<int> sizes;
     auto eles_att = module_.get_attribute("mats").toTensorList();
     for (size_t pos = 0; pos < eles_att.size(); pos++) {
       auto ele = eles_att.get(pos);
-      for (auto &f : ele.sizes()) {
+      for (auto &f: ele.sizes()) {
         sizes.push_back(static_cast<int>(f));
       }
     }
     return sizes;
   }
 
-  int64_t get_input_dim() { return module_.get_attribute("input_dim").toInt(); }
+  int64_t get_input_dim() {
+    return module_.get_attribute("input_dim").toInt();
+  }
 
   int64_t get_user_input_dim() {
     return module_.get_attribute("user_input_dim").toInt();
@@ -201,7 +221,9 @@ public:
     return module_.get_attribute("item_input_dim").toInt();
   }
 
-  int64_t get_num_fields() { return module_.get_attribute("n_fields").toInt(); }
+  int64_t get_num_fields() {
+    return module_.get_attribute("n_fields").toInt();
+  }
 
   int64_t get_user_num_fields() {
     return module_.get_attribute("user_field_num").toInt();
@@ -213,6 +235,10 @@ public:
 
   int64_t get_embedding_dim() {
     return module_.get_attribute("embedding_dim").toInt();
+  }
+
+  int64_t get_penultimate_dim() {
+    return module_.get_attribute("penultimate_dim").toInt();
   }
 
   int64_t get_user_embedding_dim() {
@@ -263,31 +289,64 @@ public:
     return sizes;
   }
 
-  std::string get_name() { return get_string("get_name"); }
+  std::string get_name() {
+    return get_string("get_name");
+  }
+
+  std::string get_meta_paths() {
+    return module_.get_attribute("get_meta_paths").toString()->string();
+  }
+
+  std::string get_total_nodes() {
+    return module_.get_attribute("get_total_nodes").toString()->string();
+  }
 
   std::string get_node_types() {
-      return module_.get_attribute("get_node_types").toString()->string();
-    }
+    return module_.get_attribute("get_node_types").toString()->string();
+  }
 
   std::string get_edge_types() {
-      return module_.get_attribute("get_edge_types").toString()->string();
-    }
+    return module_.get_attribute("get_edge_types").toString()->string();
+  }
 
   std::string get_schame() {
-      return module_.get_attribute("get_schema").toString()->string();
-    }
+    return module_.get_attribute("get_schema").toString()->string();
+  }
 
-#ifndef LIBTORCH_VERSION_LATEST
-  // iter for module and sub-module struct and get all parameter tensors
-  void geten_module_iters(torch::jit::script::Module m_,
-                          std::vector<at::Tensor> &tensors) {
-    for (auto const &p : m_.get_parameters())
+  int64_t get_max_len() {
+    return module_.get_attribute("max_len").toInt();
+  }
+
+  int64_t get_hidden_dim() {
+    return module_.get_attribute("hidden_dim").toInt();
+  }
+
+  std::string get_field_nums() {
+    return module_.get_attribute("get_field_nums").toString()->string();
+  }
+
+  std::string get_feat_embed_dims() {
+    return module_.get_attribute("get_feat_embed_dims").toString()->string();
+  }
+
+  std::string get_feature_dims() {
+    return module_.get_attribute("get_feature_dims").toString()->string();
+  }
+
+  std::string get_input_split_idxs() {
+    return module_.get_attribute("get_input_split_idxs").toString()->string();
+  }
+
+#ifndef  LIBTORCH_VERSION_LATEST
+  //iter for module and sub-module struct and get all parameter tensors
+  void geten_module_iters(torch::jit::script::Module m_, std::vector<at::Tensor> &tensors){
+    for (auto const &p: m_.get_parameters())       
       tensors.push_back(p.value().toTensor());
 
-    for (auto const &m : m_.get_slots())
-      if (m.is_module())
+    for(auto const& m: m_.get_slots())          
+      if(m.is_module())    
         geten_module_iters(m.to_module(), tensors);
-  }
+  }       
 #endif
   int get_parameters_total_size();
 
@@ -301,14 +360,14 @@ public:
 
   void zero_grad();
 
-  void set_parameter(const std::string &key, const torch::jit::IValue &value);
+  void set_parameter(const std::string& key, const torch::jit::IValue& value);
 
   void save_module(std::vector<torch::jit::IValue> parameters,
                    angel::TorchModelType type);
 
-  void save(const std::string &path);
+  void save(const std::string& path);
 
-private:
+  private:
 #ifndef LIBTORCH_VERSION_LATEST
   torch::jit::script::Module module_;
 #else

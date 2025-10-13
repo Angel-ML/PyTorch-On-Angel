@@ -62,7 +62,7 @@ class GCNConv(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, x, edge_index):
         # type: (Tensor, Tensor) -> Tensor
-        x = torch.matmul(x, self.weight)
+        x = torch.mm(x, self.weight)
         edge_index, norm = self.norm(edge_index, x.size(0))
 
         return self.propagate(edge_index, x=x, norm=norm)
@@ -128,7 +128,7 @@ class GCNConv2(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, x, edge_index):
         # type: (Tensor, Tensor) -> Tensor
-        x = torch.matmul(x, self.weight)
+        x = torch.mm(x, self.weight)
         edge_index, norm = self.norm(edge_index, x.size(0))
 
         return self.propagate(edge_index, x=x, norm=norm)

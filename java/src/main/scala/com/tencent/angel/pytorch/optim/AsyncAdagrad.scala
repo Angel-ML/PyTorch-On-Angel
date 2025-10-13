@@ -16,9 +16,12 @@
  */
 package com.tencent.angel.pytorch.optim
 
+import com.tencent.angel.graph.client.psf.universalembedding.{UniversalEmbeddingUpdate, UniversalEmbeddingUpdateParam}
+
 import java.util.concurrent.Future
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ml.matrix.psf.update.base.{UpdateParam, VoidResult}
+import com.tencent.angel.ps.storage.vector.element.IElement
 import com.tencent.angel.spark.ml.psf.optim.{AsyncAdagradFunc, AsyncOptimParam}
 import com.tencent.angel.spark.models.{PSMatrix, PSVector}
 
@@ -44,6 +47,13 @@ class AsyncAdagrad(eta: Double, decay: Double, factor: Double = 0.9)
 
   override def asyncUpdate(matrix: PSMatrix, offset: Int, grads: Array[Vector]): Future[VoidResult] = {
     asyncUpdate(matrix, offset, grads.indices.toArray, grads)
+  }
+
+  override def asyncUpdate(matrix: PSMatrix, nodeIds: Array[Long], grads: Array[IElement]): Future[VoidResult] = {
+    val floats = Array[Float](getCurrentEta.toFloat, factor.toFloat, getEpsilon)
+    val ints = Array[Int](getType)
+    val func = new UniversalEmbeddingUpdate(new UniversalEmbeddingUpdateParam(matrix.id, nodeIds, grads, floats, ints))
+    matrix.psfUpdate(func)
   }
 
   override def getType: Int = 2

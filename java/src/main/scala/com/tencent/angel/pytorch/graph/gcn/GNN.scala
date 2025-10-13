@@ -16,6 +16,7 @@
  */
 package com.tencent.angel.pytorch.graph.gcn
 
+import com.tencent.angel.graph.utils.collection.OpenHashSet
 import java.io.File
 import com.tencent.angel.pytorch.data.SampleParser
 import com.tencent.angel.pytorch.io.DataLoaderUtils
@@ -25,7 +26,6 @@ import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.graph.utils.params._
 import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.util.Identifiable
@@ -41,7 +41,8 @@ class GNN(val uid: String) extends Serializable
   with HasPartitionNum with HasPSPartitionNum with HasUseBalancePartition
   with HasDataFormat with HasStorageLevel with HasModelCheckPoint with HasPSModelCheckpointInterval
   with HasEvaluation with HasUseSecondOrder with HasPSModelCheckpoint  with HasBatchSizeMultiple
-  with HasNumLabels  with HasFeatEmbedPath with HasFeatEmbedDim with HasFieldNum with HasFieldMultiHot {
+  with HasNumLabels  with HasFeatEmbedPath with HasFeatEmbedDim with HasFieldNum with HasFieldMultiHot
+  with HasWeighted {
 
 
   def this() = this(Identifiable.randomUID("GNN"))
@@ -87,9 +88,9 @@ class GNN(val uid: String) extends Serializable
 
     // initialize embeddings
     if ($(fieldNum) > 0) {
-      if (${featEmbedPath}.length > 0) { // load sparse feature embedding
+      if ($(featEmbedPath).length > 0) { // load sparse feature embedding
         println(s"load sparse feature embedding from ${${featEmbedPath}}.")
-        model.asInstanceOf[SparseGNNPSModel].loadFeatEmbed(${featEmbedPath})
+        model.asInstanceOf[SparseGNNPSModel].loadFeatEmbed($(featEmbedPath))
       } else { // init sparse feature embedding
         println(s"init sparse feature embedding.")
         model.asInstanceOf[SparseGNNPSModel].initEmbeddings()
@@ -158,7 +159,7 @@ class GNN(val uid: String) extends Serializable
       (temp(0).toLong, Array(1f) ++ temp.slice(1, temp.length).map(_.toFloat)) // the first 1 indicates testing labels
     }.filter(f => f._1 >= minId && f._1 <= maxId)
       .mapPartitionsWithIndex((index, it) =>
-        it.sliding(${numBatchInit}, ${numBatchInit}).map(pairs => model.initMultiLabelsByBatch(pairs)))
+        it.sliding($(numBatchInit), $(numBatchInit)).map(pairs => model.initMultiLabelsByBatch(pairs)))
       .count()
   }
 
@@ -174,6 +175,21 @@ class GNN(val uid: String) extends Serializable
       .map(row => (row.getLong(0), row.getLong(1)))
       .filter(f => f._1 != f._2)
       .flatMap(f => Iterator(f._1, f._2))
+
+  def getFeatureIds(features: DataFrame): RDD[Long] = {
+    features.select("feature").rdd.filter(!_.anyNull)
+      .mapPartitions { iter =>
+        val idSet = new OpenHashSet[Long]()
+        iter.foreach { line =>
+          line.getString(0).split(" ").filter(_.contains(":")).map(_.split(":")(0).toLong)
+            .foreach { id =>
+              //            assert(id < dim, s"feature index $id should be less than $dim")
+              idSet.add(id)
+            }
+        }
+        idSet.iterator.map(x => (x, 1))
+      }.reduceByKey(_ + _, $(partitionNum)).map(_._1)
+  }
 
   def makeGraph(edges: DataFrame, model: GNNPSModel, labelDF: Option[DataFrame],
                 testLabelDF: Option[DataFrame], minId: Long, maxId: Long): Dataset[_] = ???
@@ -264,7 +280,7 @@ class GNN(val uid: String) extends Serializable
     torch.gcnSave(s"gcn-train-temp-${epoch}.pt", weights)
 
     val hdfsPath = new Path(path)
-    val conf = SparkHadoopUtil.get.newConfiguration(SparkEnv.get.conf)
+    val conf = SparkContext.getOrCreate().hadoopConfiguration
     val fs = hdfsPath.getFileSystem(conf)
     val outputPath = new Path(fs.makeQualified(hdfsPath).toUri.getPath)
     if (!fs.exists(outputPath)) {

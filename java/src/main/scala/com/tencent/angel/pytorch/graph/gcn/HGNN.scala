@@ -6,7 +6,6 @@ import com.tencent.angel.pytorch.params._
 import com.tencent.angel.pytorch.torch.TorchModel
 import com.tencent.angel.spark.context.PSContext
 import org.apache.spark.SparkContext
-import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
@@ -15,7 +14,7 @@ import scala.collection.mutable.HashMap
 
 class HGNN extends GNN with HasMetaPaths with HasFeatureDims with HasNodeNumSamples with HasTotalNodes
   with HasFieldNums with HasEmbedDims with HasTestRatio with HasFieldMultiHot with HasFilterSameNode
-  with HasFeatureSplitIdxs {
+  with HasFeatureSplitIdxs with HasInitMethod {
 
   def initialize(edgeDFs: Map[String, DataFrame], featureDFs: Map[String, DataFrame]
                 ): (HGNNPSModel, Dataset[_]) =
@@ -51,7 +50,6 @@ class HGNN extends GNN with HasMetaPaths with HasFeatureDims with HasNodeNumSamp
     setFieldNums(torch.getFieldNums)
     setEmbedDims(torch.getFeatEmbedDims)
     setFeatureDims(torch.getFeatureDims)
-    if ($(dataFormat) == FeatureFormat.DENSE_HIGH_SPARSE) setFeatureSplitIdxs(torch.getFeatureSplitIdxs)
 
     val featureIds = if ($(fieldNums).length > 0) Option(getFeatureIndexs(featureDFs)) else None
     if (featureIds.nonEmpty) featureIds.get.foreach(_._2.persist($(storageLevel)))
@@ -143,7 +141,7 @@ class HGNN extends GNN with HasMetaPaths with HasFeatureDims with HasNodeNumSamp
         .filter(row => row.get(0) != null)
         .map(row => (row.getLong(0), row.getString(1)))
         .filter(f => f._1 >= minId && f._1 <= maxId)
-        .map(f => (f._1, SampleParser.parseFeature(f._2, dimsMap.getOrElse(name, -1L).toInt, $(dataFormat), featureSplitIdxs.getOrElse(name, 0))))
+        .map(f => (f._1, SampleParser.parseFeature(f._2, dimsMap.getOrElse(name, -1L).toInt, $(dataFormat))))
         .repartition($(partitionNum))
         .mapPartitionsWithIndex((index, it) =>
           Iterator.single(NodeFeaturePartition.apply(index, it)))
@@ -152,7 +150,7 @@ class HGNN extends GNN with HasMetaPaths with HasFeatureDims with HasNodeNumSamp
   }
 
   def initExtraEmbeddings(model: HGNNPSModel, featEmbedPath: String, nodeNames: Array[String]): Unit = {
-    val conf = SparkHadoopUtil.get.newConfiguration(SparkContext.getOrCreate().getConf)
+    val conf = SparkContext.getOrCreate().hadoopConfiguration
     val keyValueSep = IOFunctions.parseSep(conf.get("angel.embedding.keyvalue.sep", "colon"))
     val featSep = IOFunctions.parseSep(conf.get("angel.embedding.feature.sep", "space"))
 
@@ -186,10 +184,9 @@ class HGNN extends GNN with HasMetaPaths with HasFeatureDims with HasNodeNumSamp
   }
 
   def getFeatureIndexs(featureDFs: Map[String, DataFrame]): Map[String, RDD[Long]] = {
-    val dimsMap = getFeatureDims
 
     featureDFs.map{ case (name, df) =>
-      val fid = getFeatureIds(df, dimsMap.getOrElse(name, -1L))
+      val fid = getFeatureIds(df)
       (name, fid)
     }
   }

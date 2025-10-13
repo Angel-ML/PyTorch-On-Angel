@@ -131,11 +131,27 @@ public class TorchModel implements Serializable {
 
   public int getItemEmbeddingDim() { return Torch.getItemEmbeddingDim(ptr); }
 
+  public String getMetaPaths() { return Torch.getMetaPaths(ptr); }
+
+  public String getTotalNodes() { return Torch.getTotalNodes(ptr); }
+
   public String getNodeTypes() { return Torch.getNodeTypes(ptr); }
 
   public String getEdgeTypes() { return Torch.getEdgeTypes(ptr); }
 
   public String getSchema() { return Torch.getSchema(ptr); }
+
+  public int getMaxLen() { return Torch.getMaxLen(ptr); }
+
+  public int getHiddenDim() { return Torch.getHiddenDim(ptr); }
+
+  public String getFieldNums() { return Torch.getFieldNums(ptr); }
+
+  public String getFeatEmbedDims() { return Torch.getFeatEmbedDims(ptr); }
+
+  public String getFeatureDims() { return Torch.getFeatureDims(ptr); }
+
+  public String getFeatureSplitIdxs() { return Torch.getFeatureSplitIdxs(ptr); }
 
   public void save(float[] bias, float[] weights, String path) {
     Map<String, Object> params = buildParams(bias, weights);

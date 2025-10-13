@@ -49,7 +49,7 @@ class RGCNConv(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, x, edge_index, edge_type, edge_norm):
         # type: (Optional[Tensor], Tensor, Tensor, Optional[Tensor]) -> Tensor
-        w = torch.matmul(self.att, self.basis.view(self.n_bases, -1))
+        w = torch.mm(self.att, self.basis.view(self.n_bases, -1))
 
         if x is None:
             w = w.view(-1, self.out_h)
@@ -68,7 +68,7 @@ class RGCNConv(torch.jit.ScriptModule):
         if x is None:
             out = out + self.root
         else:
-            out = out + torch.matmul(x[0:out.size(0)], self.root)
+            out = out + torch.mm(x[0:out.size(0)], self.root)
 
         out = out + self.bias
         return out
