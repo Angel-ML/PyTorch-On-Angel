@@ -7,7 +7,6 @@
 	---------------- | --------------- | ---------------
 	**Semi GraphSage/GAT** | edge, node feature, node label | (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte) * 2 or 3
 	**RGCN/HAN** | edge with type(dst type), node feature, node label | (edge\_num * 2 * 8Byte + edge\_num * 4Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte) * 2 or 3
-	**RGCN/HAN** | edge with type(dst type), node feature, node label | (edge\_num * 2 * 8Byte + edge\_num * 4Byte + node\_num * feature\_dim * 4Byte + the num of node with label * 4Byte) * 2 or 3
 	**DGI/Unsupervised GraphSage** | edge, node feature | (edge\_num * 2 * 8Byte + node\_num * feature\_dim * 4Byte) * 2 or 3
 	**Semi Bipartite GraphSage** | edge * 2, user feature, item feature, user label | (edge\_num * 2 * 8Byte * 2 + user\_num * user\_feature_dim * 4Byte + item\_num * item\_feature\_dim * 4Byte + user\_label\_num * 4Byte) * 2 or 3
 	**Unsupervised Bipartite GraphSage** | edge * 2, user feature, item feature | (edge\_num * 2 * 8Byte * 2 + user_num * user\_feature\_dim * 4Byte + item\_num * item_feature_dim * 4Byte) * 2 or 3

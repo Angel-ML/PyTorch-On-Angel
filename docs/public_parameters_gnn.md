@@ -1,6 +1,6 @@
 ## Public Parameters for GNN Algorithms
 
-### Input/Oupput Path
+### Input/Output Path
 
 Property Name | Default | Meaning
 ---------------- | --------------- | ---------------
@@ -42,8 +42,8 @@ numLabels | 1 | the num of multi-label classification task if numLabels > 1, `th
 Property Name | Default | Meaning
 ---------------- | --------------- | ---------------
 stepSize | 0.01 | the learning rate when training
-decay | 0.001 | the decay of learning ratio, the default is 0
-optimizer | adma | adam/momentum/sgd/adagrad
+decay | 0.001 | the decay of learning rate
+optimizer | adam | adam/momentum/sgd/adagrad
 numEpoch | 10 | number of epoches you want to run 
 testRatio | 0.5 | use how many nodes from the label file for testing(if `testLabelPath` is set, the testRatio is invalid)
 trainRatio | 0.5 | randomly sampling part of samples to train; for unsupervised gnn algo
@@ -52,7 +52,7 @@ userNumSamples | 5 | the number of samples of user neighbors training in the nex
 itemNumSamples | 5 | the number of samples of item neighbors
 second | true | whether use second hop sampling
 batchSize | 100 | batch size for each optimizing step
-actionType | train | hshould be train/predict
+actionType | train | should be train/predict
 numBatchInit | 5 | we use a mini-batch way when initializing features and network structures on parameter servers. this parameter determines how many batches we uses in this step.
 evals | acc | eval method, the default is acc, the optional value: acc,binary_acc,auc,precision,f1,rmse,recall;`multi_auc` for `numLabels` > 1
 periods | 1000 | save pt model every few epochs
