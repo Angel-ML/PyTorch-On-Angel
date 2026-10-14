@@ -43,7 +43,7 @@ trainer:
   batch_init_num: 5
   eval_metrics: "acc"
   sample_method: "random"
-  validatePeriods: 1
+  validate_periods: 1
   periods: 10
   model_save_path: "hdfs://xx/gamlp_model"
 

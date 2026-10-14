@@ -42,7 +42,7 @@ object GraphSageExample {
     val featEmbedDim = params.getOrElse("featEmbedDim", "-1").toInt
     val fieldMultiHot = params.getOrElse("fieldMultiHot", "false").toBoolean
     val batchSize = params.getOrElse("batchSize", "100").toInt
-    var torchModelPath = params.getOrElse("upload_torchModelPath", "model.pt")
+    var torchModelPath = params.getOrElse("torchModelPath", "model.pt")
     val stepSize = params.getOrElse("stepSize", "0.01").toDouble
     val featureDim = params.getOrElse("featureDim", "-1").toInt
     val optimizer = params.getOrElse("optimizer", "adam")

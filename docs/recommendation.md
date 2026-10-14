@@ -70,7 +70,7 @@ The methods are similar for other algorithms.
           --executor-cores 1 \
           --executor-memory 5g \
           --class com.tencent.angel.pytorch.examples.supervised.RecommendationExample \
-          ./pytorch-on-angel-0.3.0.jar \
+          ./pytorch-on-angel-examples-${VERSION}.jar \
           trainInput:$input batchSize:128 torchModelPath:deepfm.pt \
           stepSize:0.001 numEpoch:10 testRatio:0.1 \
           angelModelOutputPath:$output \
