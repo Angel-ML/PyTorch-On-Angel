@@ -39,7 +39,7 @@ trainer:
   sample_num: 5
   batch_init_num: 5
   eval_metrics: "acc"
-  validatePeriods: 1
+  validate_periods: 1
   periods: 10
   save_checkpoint: false
   use_shared_samples: false
